@@ -272,7 +272,7 @@ export class PrometheusSerializer {
     for (const key of ['count', 'sum'] as Array<'count' | 'sum'>) {
       results += stringify(
         name + '_' + key,
-        attributes,
+        { ...attributes, ...this._staticAttributes },
         value[key],
         this._appendTimestamp ? timestamp : undefined,
         undefined
@@ -299,7 +299,7 @@ export class PrometheusSerializer {
       }
       results += stringify(
         name + '_bucket',
-        attributes,
+        { ...attributes, ...this._staticAttributes },
         cumulativeSum,
         this._appendTimestamp ? timestamp : undefined,
         {

@@ -19,7 +19,7 @@ export class PrometheusExporter extends MetricReader {
   private readonly _appendTimestamp: boolean;
   private _serializer: PrometheusSerializer;
 
-  constructor(logger: Logger, config: ExporterConfig = {}) {
+  constructor(logger: Logger, config: ExporterConfig = {}, staticAttributes = {}) {
     super();
     this._prefix = config.prefix || OpenTelemetryPrometheusExporter.DEFAULT_OPTIONS.prefix;
     this._appendTimestamp =
@@ -27,7 +27,12 @@ export class PrometheusExporter extends MetricReader {
         ? config.appendTimestamp
         : OpenTelemetryPrometheusExporter.DEFAULT_OPTIONS.appendTimestamp;
 
-    this._serializer = new PrometheusSerializer(logger, this._prefix, this._appendTimestamp);
+    this._serializer = new PrometheusSerializer(
+      logger,
+      this._prefix,
+      this._appendTimestamp,
+      staticAttributes
+    );
   }
 
   selectAggregationTemporality(): AggregationTemporality {

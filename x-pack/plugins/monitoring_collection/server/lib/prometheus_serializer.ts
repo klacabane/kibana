@@ -175,13 +175,15 @@ export class PrometheusSerializer {
   private logger: Logger;
   private _prefix: string | undefined;
   private _appendTimestamp: boolean;
+  private _staticAttributes: Record<string, string>;
 
-  constructor(logger: Logger, prefix?: string, appendTimestamp = true) {
+  constructor(logger: Logger, prefix?: string, appendTimestamp = true, staticAttributes = {}) {
     if (prefix) {
       this._prefix = prefix + '_';
     }
     this._appendTimestamp = appendTimestamp;
     this.logger = logger;
+    this._staticAttributes = staticAttributes;
   }
 
   serialize(resourceMetrics: ResourceMetrics): string {
@@ -248,7 +250,7 @@ export class PrometheusSerializer {
     const timestamp = hrTimeToMilliseconds(dataPoint.endTime);
     results += stringify(
       name,
-      attributes,
+      { ...attributes, ...this._staticAttributes },
       value,
       this._appendTimestamp ? timestamp : undefined,
       undefined

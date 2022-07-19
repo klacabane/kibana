@@ -155,7 +155,11 @@ export class MonitoringCollectionPlugin implements Plugin<MonitoringCollectionSe
     if (this.config.opentelemetry?.metrics.prometheus.enabled) {
       // Add Prometheus exporter
       this.logger.debug(`Starting prometheus exporter at ${PROMETHEUS_ROUTE}`);
-      this.prometheusExporter = new PrometheusExporter(this.logger);
+      this.prometheusExporter = new PrometheusExporter(this.logger, undefined, {
+        serviceName,
+        serviceInstanceId,
+        serviceVersion,
+      });
       meterProvider.addMetricReader(this.prometheusExporter);
     }
   }

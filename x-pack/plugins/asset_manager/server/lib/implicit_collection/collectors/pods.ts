@@ -10,7 +10,7 @@ import { Asset } from '../../../../common/types_api';
 import { CollectorOptions, QUERY_MAX_SIZE } from '.';
 import { withSpan } from './helpers';
 
-export async function collectPods({ client, from, transaction }: CollectorOptions) {
+export async function collectPods({ client, from, to, transaction, afterKey }: CollectorOptions) {
   const dsl = {
     index: [APM_INDICES, LOGS_INDICES, METRICS_INDICES],
     size: QUERY_MAX_SIZE,
@@ -45,10 +45,14 @@ export async function collectPods({ client, from, transaction }: CollectorOption
     },
   };
 
+  if (afterKey) {
+    (dsl as any).search_after = afterKey;
+  }
+
   const esResponse = await client.search(dsl);
 
-  const pods = withSpan({ transaction, name: 'processing_response' }, () => {
-    return esResponse.hits.hits.reduce<Asset[]>((acc: Asset[], hit: any) => {
+  const result = withSpan({ transaction, name: 'processing_response' }, async () => {
+    const assets = esResponse.hits.hits.reduce<Asset[]>((acc: Asset[], hit: any) => {
       const { fields = {} } = hit;
       const podUid = fields['kubernetes.pod.uid'];
       const nodeName = fields['kubernetes.node.name'];
@@ -74,7 +78,14 @@ export async function collectPods({ client, from, transaction }: CollectorOption
 
       return acc;
     }, []);
+
+    const hitsLen = esResponse.hits.hits.length;
+    const nextKey =
+      hitsLen === QUERY_MAX_SIZE
+        ? (esResponse.hits.hits[hitsLen - 1].fields ?? {})['kubernetes.pod.uid']
+        : undefined;
+    return { assets, nextKey };
   });
 
-  return pods;
+  return result;
 }

@@ -20,7 +20,10 @@ import {
 import { upsertTemplate } from './lib/manage_index_templates';
 import { startImplicitCollection } from './lib/implicit_collection';
 import { setupRoutes } from './routes';
-import { assetsIndexTemplateConfig } from './templates/assets_template';
+import {
+  assetsIndexTemplateConfig,
+  assetsBenchmarkTemplateConfig,
+} from './templates/assets_template';
 
 export type AssetManagerServerPluginSetup = ReturnType<AssetManagerServerPlugin['setup']>;
 
@@ -93,6 +96,10 @@ export class AssetManagerServerPlugin implements Plugin<AssetManagerServerPlugin
       template: assetsIndexTemplateConfig,
       logger: this.logger,
     });
+
+    core.elasticsearch.client.asInternalUser.indices.putIndexTemplate(
+      assetsBenchmarkTemplateConfig
+    );
 
     if (this.config.implicitCollection?.enabled) {
       this.logger.info(

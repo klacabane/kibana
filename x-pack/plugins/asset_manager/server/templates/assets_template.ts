@@ -40,3 +40,32 @@ export const assetsIndexTemplateConfig: IndicesPutIndexTemplateRequest = {
     },
   },
 };
+
+export const assetsBenchmarkTemplateConfig: IndicesPutIndexTemplateRequest = {
+  name: 'benchmark-assets',
+  index_patterns: ['benchmark-assets*'],
+  priority: 100,
+  data_stream: {},
+  template: {
+    settings: {},
+    mappings: {
+      properties: {
+        '@timestamp': {
+          type: 'date',
+        },
+        collector: {
+          type: 'keyword',
+        },
+        execution_time_ms: {
+          type: 'integer',
+        },
+        total_time_ms: {
+          type: 'integer',
+        },
+        assets_count: {
+          type: 'integer',
+        },
+      },
+    },
+  },
+};

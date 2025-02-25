@@ -29,9 +29,6 @@ export const rootStreamDefinition: WiredStreamDefinition = {
         'log.level': {
           type: 'keyword',
         },
-        'stream.name': {
-          type: 'keyword',
-        },
       },
     },
   },

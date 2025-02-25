@@ -37,6 +37,7 @@ import {
   streamDefinitionSchema,
   findInheritedLifecycle,
   findInheritingStreams,
+  getSegments,
 } from '@kbn/streams-schema';
 import { cloneDeep, keyBy, omit, orderBy } from 'lodash';
 import { AssetClient } from './assets/asset_client';
@@ -180,7 +181,7 @@ export class StreamsClient {
 
     const streamsWithDepth = streams.map((stream) => ({
       stream,
-      depth: stream.name.match(/\./g)?.length ?? 0,
+      depth: getSegments(stream.name).length,
     }));
 
     const streamsInOrder = orderBy(streamsWithDepth, 'depth', 'desc');

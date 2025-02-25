@@ -331,6 +331,41 @@ export default function ({ getService }: DeploymentAgnosticFtrProviderContext) {
           await expectLifecycle([name], { ilm: { policy: 'my-policy' }, from: name });
         });
       }
+
+      it('does not trigger rollover', async () => {
+        const name = 'logs.check-rollover';
+        await putStream(apiClient, name, {
+          dashboards: [],
+          stream: {
+            ingest: {
+              ...wiredPutBody.stream.ingest,
+              routing: [],
+              lifecycle: { dsl: { data_retention: '7d' } },
+            },
+          },
+        });
+
+        const {
+          data_streams: [{ indices: initialIndices }],
+        } = await esClient.indices.getDataStream({ name });
+        expect(initialIndices.length).to.eql(1);
+
+        await putStream(apiClient, name, {
+          dashboards: [],
+          stream: {
+            ingest: {
+              ...wiredPutBody.stream.ingest,
+              routing: [],
+              lifecycle: { dsl: { data_retention: '10d' } },
+            },
+          },
+        });
+
+        const {
+          data_streams: [{ indices }],
+        } = await esClient.indices.getDataStream({ name });
+        expect(indices.length).to.eql(1);
+      });
     });
 
     describe('Unwired streams', () => {

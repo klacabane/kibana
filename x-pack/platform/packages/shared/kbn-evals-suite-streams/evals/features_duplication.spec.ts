@@ -415,11 +415,13 @@ Context:
 
       return {
         score,
-        total_features: allFeatures.length,
-        unique_by_id: uniqueById.length,
-        unique_by_fingerprint: uniqueByFingerprint,
-        missed_duplicates: missedDuplicates,
-        structural_duplicate_groups: structuralDuplicateGroups,
+        metadata: {
+          total_features: allFeatures.length,
+          unique_by_id: uniqueById.length,
+          unique_by_fingerprint: uniqueByFingerprint,
+          missed_duplicates: missedDuplicates,
+          structural_duplicate_groups: structuralDuplicateGroups,
+        },
       };
     },
   };

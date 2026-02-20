@@ -118,16 +118,57 @@ evaluate.describe('Streams features duplication (harness)', () => {
     });
   }
 
+  const SEMANTIC_UNIQUENESS_OUTPUT_SCHEMA = {
+    type: 'object',
+    properties: {
+      k: {
+        type: 'number',
+        description:
+          'Number of semantic clusters you formed — each cluster = one unique real-world concept. K is always <= N (the total number of unique-by-id features provided in the input). (integer)',
+      },
+      explanation: {
+        type: 'string',
+        description:
+          'Your reasoning: list confirmed duplicate clusters with their one-sentence identity statements, and briefly note what drives duplication (id naming instability, overly generic ids, etc.)',
+      },
+      duplicate_clusters: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            ids: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Feature ids that form the duplicate cluster',
+            },
+            identity_statement: {
+              type: 'string',
+              description:
+                'One sentence naming the single real-world component or process all members refer to',
+            },
+          },
+          required: ['ids', 'identity_statement'],
+        },
+        description: 'Up to 5 of the largest confirmed duplicate clusters',
+      },
+    },
+    required: ['k', 'explanation', 'duplicate_clusters'],
+  } as const;
+
   /**
    * Checks that all unique-by-id features are semantically distinct.
    * Score = K / N, where K = semantic clusters and N = unique ids.
    * A score < 1 means there are semantic duplicates in the feature set.
    */
-  function semanticUniquenessLlmEvaluator(evaluators: any) {
+  function createSemanticUniquenessEvaluator({
+    inferenceClient,
+  }: {
+    inferenceClient: BoundInferenceClient;
+  }) {
     return {
       name: 'llm_semantic_uniqueness',
       kind: 'LLM' as const,
-      evaluate: async ({ input, output, metadata }: any) => {
+      evaluate: async ({ input, output }: any) => {
         const runs: Array<{ features: BaseFeature[] }> = output?.runs ?? [];
         const allFeatures = runs.flatMap((run) => run.features);
 
@@ -158,72 +199,91 @@ evaluate.describe('Streams features duplication (harness)', () => {
             )
           );
 
-        const criteria = [
-          `SEMANTIC UNIQUENESS CHECK:
-You are given a list of features identified from a stream, already de-duplicated by \`id\` across all runs (one representative per unique id).
-Your job is to determine whether all unique ids are truly semantically distinct from each other, or whether some are SEMANTIC DUPLICATES.
+        const result = await inferenceClient.output({
+          id: 'semantic_uniqueness_analysis',
+          system: `You are an automated quality-assurance LLM evaluating feature extraction from log streams.
+
+Your task: given a list of features already de-duplicated by id (one representative per unique id), determine whether all unique ids are truly semantically distinct, or whether some are SEMANTIC DUPLICATES — features that refer to the exact same underlying real-world component or fact, even if their ids, titles, or descriptions differ slightly.
 
 Definitions:
-- A "semantic duplicate" means two features that refer to the exact same underlying real-world component or fact, even if their ids, titles, or descriptions differ slightly.
 - Only compare features within the same category: type + subtype must match for two features to be considered duplicates.
-- If it is ambiguous whether two features refer to the same thing, treat them as NOT duplicates.
-- Features that belong to the same technology family but represent different components, layers, or roles are NOT duplicates. Do NOT cluster features together just because they share a common technology or domain prefix.
-- Two features are duplicates only if an operator managing this stream would consider them interchangeable: knowing one tells you everything knowing the other would. If they describe different operational concerns (different failure modes, different config knobs, different responsible teams), they are distinct.
+- If ambiguous, treat as NOT duplicates.
+- Same technology family ≠ duplicates. Only truly interchangeable features are duplicates.
+- Two features are duplicates only if an operator would consider them interchangeable: knowing one tells you everything knowing the other would.
 
 Burden of proof for each cluster:
-- Before placing two features in the same cluster, you must be able to state in one sentence what single real-world thing all members refer to.
-- A valid identity statement names a specific component or process, not a category or domain (e.g. "all relate to X technology" or "all involve Y protocol" are categories, not identities — split the cluster).
+- You must be able to state in one sentence what single real-world thing all members refer to.
+- A valid identity statement names a specific component or process, not a category or domain.
 - If you cannot write the one-sentence identity, the features are NOT duplicates.
 
 Method:
-- Read the full list of unique features in the output.
-- For each candidate cluster, apply the burden-of-proof test above before finalising it.
-- Group confirmed duplicates into "semantic clusters" — each cluster = one unique underlying real-world feature.
-- N = the number of entries in \`unique_features_by_id\` (provided in the output).
-- K = the number of clusters YOU form during your analysis. K is always <= N.
-
-Scoring:
-- You MUST state N and K as explicit integers before computing the score.
-- You MUST compute score = K / N as an explicit arithmetic step and return that value.
-- score = K / N
-  - 1.0 means every feature is semantically unique (no duplicates, ideal)
-  - lower is worse; e.g. 0.5 means on average each concept appears under two different ids
-- Example: N=24, K=22 → score = 22/24 = 0.917
-
-In your explanation:
-- State N and K as integers, then write "score = K / N = <value>".
-- Report the implied duplicate rate (1 - K/N).
-- For each duplicate cluster, include the one-sentence identity statement that justifies it.
-- List up to 5 of the largest duplicate clusters as arrays of feature ids (include type+subtype).
-- Briefly note what drives the duplication (id naming instability, meaning drift, overly generic ids, etc.).
-
-Deterministic hints (always unique_by_fingerprint <= unique_by_id):
-- unique_by_id (= N) = ${uniqueById}
-- unique_by_fingerprint (among the same N features, based on type+subtype+properties) = ${uniqueByFingerprint}
-  A gap here (unique_by_fingerprint < N) signals features with different ids but identical structure.
-`,
-        ];
-
-        return evaluators.criteria(criteria).evaluate({
-          input: {
+1. Read the full list of unique features.
+2. Apply the burden-of-proof test before finalising each cluster.
+3. Return K = the number of semantic clusters you formed. K must be <= N (provided in the input as unique_by_id).`,
+          input: JSON.stringify({
             stream_name: input?.stream_name,
-            runs: input?.runs ?? runs.length,
-            metadata,
-          },
-          output: {
-            unique_features_by_id: compactUniqueFeatures,
             totals: {
               runs: runs.length,
               total_features: allFeatures.length,
               unique_by_id: uniqueById,
               unique_by_fingerprint: uniqueByFingerprint,
             },
-          },
-          expected: {},
+            unique_features_by_id: compactUniqueFeatures,
+          }),
+          schema: SEMANTIC_UNIQUENESS_OUTPUT_SCHEMA,
+          retry: { onValidationError: 3 },
         });
+
+        const { k, explanation, duplicate_clusters } = result.output;
+        const score = uniqueById > 0 ? k / uniqueById : 1;
+
+        return {
+          score,
+          explanation,
+          metadata: {
+            n: uniqueById,
+            k,
+            duplicate_rate: uniqueById > 0 ? 1 - k / uniqueById : 0,
+            duplicate_clusters,
+            unique_by_id: uniqueById,
+            unique_by_fingerprint: uniqueByFingerprint,
+          },
+        };
       },
     };
   }
+
+  const ID_CONSISTENCY_OUTPUT_SCHEMA = {
+    type: 'object',
+    properties: {
+      collision_groups: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              description: 'The feature id that is a collision',
+            },
+            reason: {
+              type: 'string',
+              description:
+                'One sentence explaining why the variants conflict (e.g. "variant A describes X while variant B describes Y")',
+            },
+          },
+          required: ['id', 'reason'],
+        },
+        description:
+          'Id groups you judge as INCONSISTENT (genuine collisions). Omit groups where variants clearly refer to the same underlying concept, even if wording differs.',
+      },
+      explanation: {
+        type: 'string',
+        description:
+          'Brief summary: note what drives collisions (overly generic ids, type confusion, unstable naming, etc.)',
+      },
+    },
+    required: ['collision_groups', 'explanation'],
+  } as const;
 
   /**
    * Checks that features sharing the same id across runs refer to the same concept.
@@ -231,11 +291,15 @@ Deterministic hints (always unique_by_fingerprint <= unique_by_id):
    * identical occurrences are counted as consistent without an LLM call.
    * Score = (trivially_consistent + llm_consistent) / total_multi_occurrence_ids.
    */
-  function idConsistencyLlmEvaluator(evaluators: any) {
+  function createIdConsistencyEvaluator({
+    inferenceClient,
+  }: {
+    inferenceClient: BoundInferenceClient;
+  }) {
     return {
       name: 'llm_id_consistency',
       kind: 'LLM' as const,
-      evaluate: async ({ input, output, metadata }: any) => {
+      evaluate: async ({ input, output }: any) => {
         const runs: Array<{ features: BaseFeature[] }> = output?.runs ?? [];
         const allFeatures = runs.flatMap((run) => run.features);
 
@@ -293,67 +357,50 @@ Deterministic hints (always unique_by_fingerprint <= unique_by_id):
           })),
         }));
 
-        const criteria = [
-          `ID CONSISTENCY CHECK:
-You are given groups of features that share the same \`id\` but were produced with different content across multiple feature-identification runs on the SAME stream.
-Ideally, features with the same id always represent the same underlying real-world concept — id collisions (the same id used for different concepts) are a bug.
+        const result = await inferenceClient.output({
+          id: 'id_consistency_analysis',
+          system: `You are an automated quality-assurance LLM evaluating feature extraction from log streams.
 
-For each group you receive the distinct content variants observed for that id.
+You are given groups of features that share the same id but were produced with different content across multiple runs on the SAME stream.
+Features with the same id should always represent the same underlying real-world concept. An id collision — the same id used for genuinely different concepts — is a bug.
 
 Definitions:
 - "Consistent": all variants in the group clearly refer to the same underlying concept, even if minor wording or property details differ.
-- "Inconsistent" (collision): the same id is used for different concepts in different runs — this means a feature is being incorrectly overwritten.
+- "Collision" (inconsistent): the same id is used for different concepts in different runs.
 
 Method:
-- For each id group, decide: consistent or inconsistent.
-- Let M = number of ambiguous id groups provided (those with differing content across runs).
-- Let C = number of groups you judge as consistent.
-
-Scoring (score applies only to the ambiguous groups):
-- score = C / M
-  - 1.0 means all differing-content ids are still referring to the same concept (minor drift, acceptable)
-  - lower is worse; a score of 0.7 means 30% of the ambiguous ids are genuine collisions
-
-In your explanation:
-- Report M and C, and the collision rate among ambiguous ids (1 - C/M).
-- For each inconsistent id group (up to 5), show:
-  - the id
-  - each variant's type, subtype, title, and a brief description of the concept it represents
-  - a one-sentence summary of why the variants conflict (e.g. "variant A describes X while variant B describes Y")
-- Note what seems to drive collisions (overly generic ids, type confusion, unstable naming, etc.).
-
-Context:
-- total_multi_occurrence_ids=${totalMultiOccurrence}
-- trivially_consistent_ids=${triviallyConsistent.length} (same fingerprint every time, not shown here)
-- ambiguous_ids_sent_to_llm=${ambiguous.length}
-`,
-        ];
-
-        const llmResult = await evaluators.criteria(criteria).evaluate({
-          input: {
+- For each id group, decide: consistent or collision.
+- Only include groups in collision_groups that are genuine collisions.
+- M (total ambiguous groups) and trivially_consistent_ids are provided as context; you do not need to report them.`,
+          input: JSON.stringify({
             stream_name: input?.stream_name,
-            runs: input?.runs ?? runs.length,
-            metadata,
-          },
-          output: {
+            context: {
+              total_multi_occurrence_ids: totalMultiOccurrence,
+              trivially_consistent_ids: triviallyConsistent.length,
+              ambiguous_ids_sent_to_llm: ambiguous.length,
+            },
             id_groups: idGroups,
-          },
-          expected: {},
+          }),
+          schema: ID_CONSISTENCY_OUTPUT_SCHEMA,
+          retry: { onValidationError: 3 },
         });
 
-        // Combine the LLM score (over ambiguous ids) with the trivially consistent ids
-        // to produce a final score over all multi-occurrence ids.
-        const llmConsistent = (llmResult.score ?? 1) * ambiguous.length;
-        const finalScore = (triviallyConsistent.length + llmConsistent) / totalMultiOccurrence;
+        const { collision_groups, explanation } = result.output;
+
+        // C = ambiguous groups the LLM judged consistent; computed from what we know locally
+        const llmConsistent = ambiguous.length - collision_groups.length;
+        const finalScore =
+          (triviallyConsistent.length + llmConsistent) / totalMultiOccurrence;
 
         return {
-          ...llmResult,
           score: finalScore,
+          explanation,
           metadata: {
-            ...llmResult.metadata,
             total_multi_occurrence_ids: totalMultiOccurrence,
             trivially_consistent: triviallyConsistent.length,
             ambiguous: ambiguous.length,
+            collisions: collision_groups.length,
+            collision_groups,
           },
         };
       },
@@ -441,7 +488,10 @@ Context:
 
       evaluate(
         'Features duplication - sample logs',
-        async ({ apiServices, config, esClient, inferenceClient, logger, phoenixClient, evaluators }) => {
+        async ({ apiServices, config, esClient, inferenceClient, evaluationConnector, logger, phoenixClient }) => {
+          const evaluatorInferenceClient = inferenceClient.bindTo({
+            connectorId: evaluationConnector.id,
+          });
 
           await indexLogs({ scenario: 'sample_logs', config });
 
@@ -473,8 +523,8 @@ Context:
             },
             [
               duplicationEvaluator,
-              semanticUniquenessLlmEvaluator(evaluators),
-              idConsistencyLlmEvaluator(evaluators),
+              createSemanticUniquenessEvaluator({ inferenceClient: evaluatorInferenceClient }),
+              createIdConsistencyEvaluator({ inferenceClient: evaluatorInferenceClient }),
             ]
           );
         });

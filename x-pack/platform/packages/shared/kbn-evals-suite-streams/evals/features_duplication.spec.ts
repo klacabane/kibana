@@ -183,12 +183,15 @@ Method:
 - K = the number of clusters YOU form during your analysis. K is always <= N.
 
 Scoring:
+- You MUST state N and K as explicit integers before computing the score.
+- You MUST compute score = K / N as an explicit arithmetic step and return that value.
 - score = K / N
   - 1.0 means every feature is semantically unique (no duplicates, ideal)
   - lower is worse; e.g. 0.5 means on average each concept appears under two different ids
+- Example: N=24, K=22 → score = 22/24 = 0.917
 
 In your explanation:
-- State the N you counted from the list and the K you determined by clustering.
+- State N and K as integers, then write "score = K / N = <value>".
 - Report the implied duplicate rate (1 - K/N).
 - For each duplicate cluster, include the one-sentence identity statement that justifies it.
 - List up to 5 of the largest duplicate clusters as arrays of feature ids (include type+subtype).
@@ -313,7 +316,10 @@ Scoring (score applies only to the ambiguous groups):
 
 In your explanation:
 - Report M and C, and the collision rate among ambiguous ids (1 - C/M).
-- List up to 5 examples of inconsistent id groups, showing the id and briefly describing the conflicting concepts.
+- For each inconsistent id group (up to 5), show:
+  - the id
+  - each variant's type, subtype, title, and a brief description of the concept it represents
+  - a one-sentence summary of why the variants conflict (e.g. "variant A describes X while variant B describes Y")
 - Note what seems to drive collisions (overly generic ids, type confusion, unstable naming, etc.).
 
 Context:

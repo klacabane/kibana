@@ -380,9 +380,33 @@ Context:
       // (same content, different ids). Id collisions (same id, different content across runs)
       // are a separate concern handled by the llm_id_consistency evaluator.
       const uniqueById = uniqBy(allFeatures, 'id');
-      const uniqueByFingerprint = uniqBy(uniqueById, featureFingerprint);
 
-      const missedDuplicates = uniqueById.length - uniqueByFingerprint.length;
+      const featuresById = new Map(uniqueById.map((f) => [f.id, f]));
+      const fingerprintToIds = new Map<string, string[]>();
+      for (const feature of uniqueById) {
+        const fp = featureFingerprint(feature);
+        const ids = fingerprintToIds.get(fp) ?? [];
+        ids.push(feature.id);
+        fingerprintToIds.set(fp, ids);
+      }
+
+      const uniqueByFingerprint = [...fingerprintToIds.keys()].length;
+
+      // Groups of ids that share an identical fingerprint — these are structural duplicates
+      // the model generated with different ids but identical (type, subtype, properties).
+      const structuralDuplicateGroups = [...fingerprintToIds.values()]
+        .filter((ids) => ids.length > 1)
+        .map((ids) => {
+          const representative = featuresById.get(ids[0])!;
+          return {
+            ids,
+            type: representative.type,
+            subtype: representative.subtype,
+            properties: representative.properties,
+          };
+        });
+
+      const missedDuplicates = uniqueById.length - uniqueByFingerprint;
 
       const score =
         uniqueById.length > 0
@@ -391,12 +415,11 @@ Context:
 
       return {
         score,
-        metadata: {
-          total_features: allFeatures.length,
-          unique_by_id: uniqueById.length,
-          unique_by_fingerprint: uniqueByFingerprint.length,
-          missed_duplicates: missedDuplicates,
-        },
+        total_features: allFeatures.length,
+        unique_by_id: uniqueById.length,
+        unique_by_fingerprint: uniqueByFingerprint,
+        missed_duplicates: missedDuplicates,
+        structural_duplicate_groups: structuralDuplicateGroups,
       };
     },
   };

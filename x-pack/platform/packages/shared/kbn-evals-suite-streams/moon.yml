@@ -35,6 +35,7 @@ dependsOn:
   - '@kbn/core'
   - '@kbn/dissect-heuristics'
   - '@kbn/es-query'
+  - '@kbn/inference-common'
 tags:
   - functional-tests
   - package

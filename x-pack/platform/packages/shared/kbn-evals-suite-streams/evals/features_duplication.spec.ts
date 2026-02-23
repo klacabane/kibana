@@ -5,22 +5,19 @@
  * 2.0.
  */
 
-import Path from 'path';
-import { node } from 'execa';
-import { REPO_ROOT } from '@kbn/repo-info';
 import kbnDatemath from '@kbn/datemath';
 import { getSampleDocuments } from '@kbn/ai-tools';
-import type { ScoutTestConfig } from '@kbn/scout';
 import { tags } from '@kbn/scout';
 import type { BaseFeature } from '@kbn/streams-schema';
 import { identifyFeatures } from '@kbn/streams-ai';
 import { featuresPrompt } from '@kbn/streams-ai/src/features/prompt';
 import { uniqBy } from 'lodash';
 import objectHash from 'object-hash';
-import { ElasticsearchClient } from '@kbn/core/server';
-import { BoundInferenceClient } from '@kbn/inference-common';
+import type { ElasticsearchClient } from '@kbn/core/server';
+import type { BoundInferenceClient } from '@kbn/inference-common';
 import { evaluate } from '../src/evaluate';
 import { FEATURES_DUPLICATION_DATASETS } from './features_duplication_datasets';
+import { indexSynthtraceScenario } from './synthtrace_helpers';
 
 evaluate.describe.configure({ timeout: 600_000 });
 
@@ -28,65 +25,20 @@ evaluate.describe('Streams features duplication (harness)', () => {
   const from = kbnDatemath.parse('now-10m')!;
   const to = kbnDatemath.parse('now')!;
 
-  function getSharedArgs({ config }: { config: ScoutTestConfig }) {
-    const esUrl = new URL(config.hosts.elasticsearch);
-    const kbnUrl = new URL(config.hosts.kibana);
-
-    esUrl.username = config.auth.username;
-    esUrl.password = config.auth.password;
-
-    kbnUrl.username = config.auth.username;
-    kbnUrl.password = config.auth.password;
-
-    return [
-      `--from=${from.toISOString()}`,
-      `--to=${to.toISOString()}`,
-      `--kibana=${kbnUrl.toString()}`,
-      `--target=${esUrl.toString()}`,
-      '--assume-package-version=9.2.0',
-      '--workers=1',
-    ];
-  }
-
-  const synthtraceScript = Path.join(REPO_ROOT, 'scripts/synthtrace.js');
-
-  async function indexLogs({
-    scenario,
-    scenarioOpts,
-    config,
-  }: {
-    scenario: string;
-    scenarioOpts?: Record<string, string | number | boolean>;
-    config: ScoutTestConfig;
-  }) {
-    const optsArgs = Object.entries(scenarioOpts ?? {}).map(([key, value]) =>
-      typeof value === 'number' || typeof value === 'boolean'
-        ? `--scenarioOpts.${key}=${value}`
-        : `--scenarioOpts.${key}="${value}"`
-    );
-    await node(
-      require.resolve(synthtraceScript),
-      [
-        scenario,
-        ...getSharedArgs({ config }),
-        ...optsArgs,
-      ],
-      { stdio: 'inherit' }
-    );
-  }
-
   async function runRepeatedFeatureIdentification({
     esClient,
     streamName,
     runs,
     inferenceClient,
     logger,
+    sampleSize,
   }: {
     esClient: ElasticsearchClient;
     streamName: string;
     runs: number;
     inferenceClient: BoundInferenceClient;
     logger: any;
+    sampleSize: number;
   }): Promise<{
     runs: Array<{
       features: BaseFeature[];
@@ -98,7 +50,7 @@ evaluate.describe('Streams features duplication (harness)', () => {
       const { hits: sampleDocuments } = await getSampleDocuments({
         esClient,
         index: streamName,
-        size: 20,
+        size: sampleSize,
         start: from.valueOf(),
         end: to.valueOf(),
       });
@@ -501,10 +453,12 @@ Method:
             connectorId: evaluationConnector.id,
           });
 
-          await indexLogs({
+          await indexSynthtraceScenario({
             scenario: dataset.input.scenario,
             scenarioOpts: dataset.input.scenarioOpts,
             config,
+            from,
+            to,
           });
 
           await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -516,13 +470,14 @@ Method:
                 description: dataset.description,
                 examples: [{ input: dataset.input }],
               },
-              task: async ({ input }: { input: { stream_name: string; runs: number } }) => {
+              task: async ({ input }: { input: { stream_name: string; runs: number; sample_document_count: number } }) => {
                 return runRepeatedFeatureIdentification({
                   esClient,
                   streamName: input.stream_name,
                   runs: input.runs,
                   inferenceClient,
                   logger,
+                  sampleSize: input.sample_document_count,
                 });
               },
             },

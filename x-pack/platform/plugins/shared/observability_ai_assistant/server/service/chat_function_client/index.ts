@@ -9,7 +9,6 @@ import { jsonSchemaToZod } from '@n8n/json-schema-to-zod';
 import { z } from '@kbn/zod';
 import { compact, keyBy } from 'lodash';
 import type { Logger } from '@kbn/logging';
-import type { ToolSchema } from '@kbn/inference-common';
 import { createToolValidationError } from '@kbn/inference-plugin/common/chat_complete/errors';
 import { type FunctionResponse } from '../../../common/functions/types';
 import type { Message, ObservabilityAIAssistantScreenContextRequest } from '../../../common/types';
@@ -24,8 +23,11 @@ import type {
 } from '../types';
 import { registerGetDataOnScreenFunction } from '../../functions/get_data_on_screen';
 
-const toZodSchema = (schema: ToolSchema): z.ZodTypeAny => {
-  return jsonSchemaToZod(schema as Parameters<typeof jsonSchemaToZod>[0]) as z.ZodTypeAny;
+const toZodSchema = (schema: Record<string, any>): z.ZodTypeAny => {
+  const normalized =
+    'properties' in schema && !('type' in schema) ? { type: 'object', ...schema } : schema;
+
+  return jsonSchemaToZod(normalized as any) as z.ZodTypeAny;
 };
 
 export class ChatFunctionClient {
@@ -50,7 +52,7 @@ export class ChatFunctionClient {
 
   registerFunction: RegisterFunction = (definition, respond) => {
     if (definition.parameters) {
-      this.validators.set(definition.name, toZodSchema(definition.parameters as ToolSchema));
+      this.validators.set(definition.name, toZodSchema(definition.parameters));
     }
     this.functionRegistry.set(definition.name, { handler: { definition, respond } });
   };

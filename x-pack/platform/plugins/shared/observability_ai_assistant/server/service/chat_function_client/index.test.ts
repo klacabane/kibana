@@ -28,7 +28,6 @@ describe('chatFunctionClient', () => {
           description: '',
           name: 'myFunction',
           parameters: {
-            type: 'object',
             properties: {
               foo: {
                 type: 'string',
@@ -71,7 +70,6 @@ describe('chatFunctionClient', () => {
           description: '',
           name: 'myFunction',
           parameters: {
-            type: 'object',
             properties: {
               foo: { type: 'string' },
             },
@@ -107,7 +105,6 @@ describe('chatFunctionClient', () => {
           description: '',
           name: 'myFunction',
           parameters: {
-            type: 'object',
             properties: {
               foo: { type: 'string' },
             },
@@ -134,17 +131,16 @@ describe('chatFunctionClient', () => {
     });
   });
 
-  describe('when parameters schema has explicit type: object', () => {
-    it('validates correctly', async () => {
+  describe('when parameters schema has no explicit type field', () => {
+    it('validates correctly via toZodSchema normalization', async () => {
       const respondFn = jest.fn().mockResolvedValue({ content: 'ok' });
       const client = new ChatFunctionClient([]);
 
       client.registerFunction(
         {
           description: '',
-          name: 'typedFunction',
+          name: 'noTypeFunction',
           parameters: {
-            type: 'object',
             properties: {
               bar: { type: 'number' },
             },
@@ -157,7 +153,7 @@ describe('chatFunctionClient', () => {
       await expect(async () => {
         await client.executeFunction({
           chat: jest.fn(),
-          name: 'typedFunction',
+          name: 'noTypeFunction',
           args: JSON.stringify({ bar: 'not_a_number' }),
           messages: [],
           signal: new AbortController().signal,
@@ -165,11 +161,11 @@ describe('chatFunctionClient', () => {
           connectorId: 'foo',
           simulateFunctionCalling: false,
         });
-      }).rejects.toThrowError('Tool call arguments for typedFunction were invalid');
+      }).rejects.toThrowError('Tool call arguments for noTypeFunction were invalid');
 
       const result = await client.executeFunction({
         chat: jest.fn(),
-        name: 'typedFunction',
+        name: 'noTypeFunction',
         args: JSON.stringify({ bar: 42 }),
         messages: [],
         signal: new AbortController().signal,

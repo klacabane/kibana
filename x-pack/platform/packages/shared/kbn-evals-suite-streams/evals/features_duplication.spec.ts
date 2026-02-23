@@ -349,8 +349,7 @@ Method:
 
         // C = ambiguous groups the LLM judged consistent; computed from what we know locally
         const llmConsistent = ambiguous.length - collision_groups.length;
-        const finalScore =
-          (triviallyConsistent.length + llmConsistent) / totalMultiOccurrence;
+        const finalScore = (triviallyConsistent.length + llmConsistent) / totalMultiOccurrence;
 
         return {
           score: finalScore,
@@ -370,11 +369,7 @@ Method:
   const duplicationEvaluator = {
     name: 'features_duplication',
     kind: 'CODE' as const,
-    evaluate: async ({
-      output,
-    }: {
-      output: { runs?: Array<{ features: BaseFeature[] }> };
-    }) => {
+    evaluate: async ({ output }: { output: { runs?: Array<{ features: BaseFeature[] }> } }) => {
       const allFeatures = output.runs?.flatMap((run) => run.features) || [];
 
       if (allFeatures.length === 0) {
@@ -416,9 +411,7 @@ Method:
       const missedDuplicates = uniqueById.length - uniqueByFingerprint;
 
       const score =
-        uniqueById.length > 0
-          ? Math.max(0, 1 - missedDuplicates / uniqueById.length)
-          : 1;
+        uniqueById.length > 0 ? Math.max(0, 1 - missedDuplicates / uniqueById.length) : 1;
 
       return {
         score,
@@ -448,7 +441,14 @@ Method:
 
       evaluate(
         dataset.name,
-        async ({ config, esClient, inferenceClient, evaluationConnector, logger, phoenixClient }) => {
+        async ({
+          config,
+          esClient,
+          inferenceClient,
+          evaluationConnector,
+          logger,
+          phoenixClient,
+        }) => {
           const evaluatorInferenceClient = inferenceClient.bindTo({
             connectorId: evaluationConnector.id,
           });
@@ -470,7 +470,11 @@ Method:
                 description: dataset.description,
                 examples: [{ input: dataset.input }],
               },
-              task: async ({ input }: { input: { stream_name: string; runs: number; sample_document_count: number } }) => {
+              task: async ({
+                input,
+              }: {
+                input: { stream_name: string; runs: number; sample_document_count: number };
+              }) => {
                 return runRepeatedFeatureIdentification({
                   esClient,
                   streamName: input.stream_name,
@@ -487,8 +491,8 @@ Method:
               createIdConsistencyEvaluator({ inferenceClient: evaluatorInferenceClient }),
             ]
           );
-        });
+        }
+      );
     });
   });
 });
-

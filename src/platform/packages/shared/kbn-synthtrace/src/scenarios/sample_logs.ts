@@ -23,10 +23,11 @@ const scenario: Scenario<LogDocument> = async (runOptions) => {
   const { logger } = runOptions;
   const client = new SampleParserClient({ logger });
 
-  const { rpm, streamType, systems } = (runOptions.scenarioOpts ?? {}) as {
+  const { rpm, streamType, systems, skipFork } = (runOptions.scenarioOpts ?? {}) as {
     rpm?: number;
     systems?: string | string[];
     streamType?: 'classic' | 'wired';
+    skipFork?: boolean;
   };
 
   const generators = await client.getLogGenerators({
@@ -40,6 +41,10 @@ const scenario: Scenario<LogDocument> = async (runOptions) => {
   return {
     bootstrap: async ({ streamsClient }) => {
       await streamsClient.enable();
+
+      if (skipFork) {
+        return;
+      }
 
       try {
         // Setting linux child stream

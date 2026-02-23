@@ -52,16 +52,24 @@ evaluate.describe('Streams features duplication (harness)', () => {
 
   async function indexLogs({
     scenario,
+    scenarioOpts,
     config,
   }: {
     scenario: string;
+    scenarioOpts?: Record<string, string | number | boolean>;
     config: ScoutTestConfig;
   }) {
+    const optsArgs = Object.entries(scenarioOpts ?? {}).map(([key, value]) =>
+      typeof value === 'number' || typeof value === 'boolean'
+        ? `--scenarioOpts.${key}=${value}`
+        : `--scenarioOpts.${key}="${value}"`
+    );
     await node(
       require.resolve(synthtraceScript),
       [
         scenario,
         ...getSharedArgs({ config }),
+        ...optsArgs,
       ],
       { stdio: 'inherit' }
     );
@@ -487,29 +495,26 @@ Method:
       });
 
       evaluate(
-        'Features duplication - sample logs',
-        async ({ apiServices, config, esClient, inferenceClient, evaluationConnector, logger, phoenixClient }) => {
+        dataset.name,
+        async ({ config, esClient, inferenceClient, evaluationConnector, logger, phoenixClient }) => {
           const evaluatorInferenceClient = inferenceClient.bindTo({
             connectorId: evaluationConnector.id,
           });
 
-          await indexLogs({ scenario: 'sample_logs', config });
+          await indexLogs({
+            scenario: dataset.input.scenario,
+            scenarioOpts: dataset.input.scenarioOpts,
+            config,
+          });
 
           await new Promise((resolve) => setTimeout(resolve, 3000));
 
           await phoenixClient.runExperiment(
             {
               dataset: {
-                name: `Features duplication - sample logs`,
+                name: dataset.name,
                 description: dataset.description,
-                examples: [
-                  {
-                    input: {
-                      stream_name: 'logs',
-                      runs: 5,
-                    },
-                  },
-                ],
+                examples: [{ input: dataset.input }],
               },
               task: async ({ input }: { input: { stream_name: string; runs: number } }) => {
                 return runRepeatedFeatureIdentification({

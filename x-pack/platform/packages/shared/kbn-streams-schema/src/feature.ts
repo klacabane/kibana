@@ -60,12 +60,13 @@ export function isComputedFeature(feature: BaseFeature): boolean {
 }
 
 export function hasSameFingerprint(feature: BaseFeature, other: BaseFeature): boolean {
-  return feature.type === other.type &&
+  return (
+    feature.type === other.type &&
     feature.subtype === other.subtype &&
     isEqual(feature.properties, other.properties)
+  );
 }
 
 export function isDuplicateFeature(feature: BaseFeature, other: BaseFeature): boolean {
-  return feature.id.toLowerCase() === other.id.toLowerCase()
-    || hasSameFingerprint(feature, other);
+  return feature.id.toLowerCase() === other.id.toLowerCase() || hasSameFingerprint(feature, other);
 }

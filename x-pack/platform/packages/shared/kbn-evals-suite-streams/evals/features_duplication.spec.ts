@@ -128,7 +128,13 @@ evaluate.describe('Streams features duplication (harness)', () => {
     return {
       name: 'llm_semantic_uniqueness',
       kind: 'LLM' as const,
-      evaluate: async ({ input, output }: { input: { stream_name: string }; output: { runs?: Array<{ features: BaseFeature[] }> } }) => {
+      evaluate: async ({
+        input,
+        output,
+      }: {
+        input: { stream_name: string };
+        output: { runs?: Array<{ features: BaseFeature[] }> };
+      }) => {
         const runs: Array<{ features: BaseFeature[] }> = output?.runs ?? [];
         const allFeatures = runs.flatMap((run) => run.features);
 
@@ -259,7 +265,13 @@ Method:
     return {
       name: 'llm_id_consistency',
       kind: 'LLM' as const,
-      evaluate: async ({ input, output }: { input: { stream_name: string }; output: { runs?: Array<{ features: BaseFeature[] }> } }) => {
+      evaluate: async ({
+        input,
+        output,
+      }: {
+        input: { stream_name: string };
+        output: { runs?: Array<{ features: BaseFeature[] }> };
+      }) => {
         const runs: Array<{ features: BaseFeature[] }> = output?.runs ?? [];
         const allFeatures = runs.flatMap((run) => run.features);
 

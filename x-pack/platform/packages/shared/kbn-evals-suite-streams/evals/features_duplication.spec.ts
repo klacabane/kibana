@@ -8,10 +8,10 @@
 import kbnDatemath from '@kbn/datemath';
 import { getSampleDocuments } from '@kbn/ai-tools';
 import { tags } from '@kbn/scout';
-import type { BaseFeature } from '@kbn/streams-schema';
+import { isDuplicateFeature, type BaseFeature } from '@kbn/streams-schema';
 import { identifyFeatures } from '@kbn/streams-ai';
 import { featuresPrompt } from '@kbn/streams-ai/src/features/prompt';
-import { uniqBy } from 'lodash';
+import { uniqBy, uniqWith } from 'lodash';
 import objectHash from 'object-hash';
 import type { ElasticsearchClient, Logger } from '@kbn/core/server';
 import type { BoundInferenceClient } from '@kbn/inference-common';
@@ -148,7 +148,7 @@ evaluate.describe('Streams features duplication (harness)', () => {
         // so unique_by_fingerprint <= unique_by_id always holds.
         // If unique_by_fingerprint < unique_by_id, some features with different ids
         // have identical (type, subtype, properties) — a strong structural duplication signal.
-        const uniqueByFingerprint = uniqBy(featuresUniqueById, featureFingerprint).length;
+        const uniqueByFingerprint = uniqWith(featuresUniqueById, isDuplicateFeature).length;
 
         const compactUniqueFeatures = featuresUniqueById
           .map((feature) => ({

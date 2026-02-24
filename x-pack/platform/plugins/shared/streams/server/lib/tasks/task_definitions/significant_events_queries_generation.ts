@@ -155,7 +155,9 @@ export function createStreamsSignificantEventsQueriesGenerationTask(taskContext:
                 );
               } catch (error) {
                 if (isDefinitionNotFoundError(error)) {
-                  taskContext.logger.debug(`Stream ${streamName} was deleted before significant events queries generation task started, skipping`);
+                  taskContext.logger.debug(
+                    `Stream ${streamName} was deleted before significant events queries generation task started, skipping`
+                  );
                   return getDeleteTaskRunResult();
                 }
 

@@ -116,7 +116,8 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   });
                   if (existing) {
                     taskContext.logger.debug(
-                      `Overwriting feature with id [${feature.id
+                      `Overwriting feature with id [${
+                        feature.id
                       }] since it already exists.\nExisting feature: ${JSON.stringify(
                         existing
                       )}\nNew feature: ${JSON.stringify(feature)}`
@@ -145,7 +146,9 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 );
               } catch (error) {
                 if (isDefinitionNotFoundError(error)) {
-                  taskContext.logger.debug(`Stream ${streamName} was deleted before features identification task started, skipping`);
+                  taskContext.logger.debug(
+                    `Stream ${streamName} was deleted before features identification task started, skipping`
+                  );
                   return getDeleteTaskRunResult();
                 }
 

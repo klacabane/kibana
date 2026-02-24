@@ -18,6 +18,7 @@ import { v4 as uuid, v5 as uuidv5 } from 'uuid';
 import { getDeleteTaskRunResult } from '@kbn/task-manager-plugin/server/task';
 import type { LogMeta } from '@kbn/logging';
 import { getErrorMessage } from '../../streams/errors/parse_error';
+import { isDefinitionNotFoundError } from '../../streams/errors/definition_not_found_error';
 import { formatInferenceProviderError } from '../../../routes/utils/create_connector_sse_error';
 import type { TaskContext } from '.';
 import type { TaskParams } from '../types';
@@ -144,6 +145,13 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   { features }
                 );
               } catch (error) {
+                if (isDefinitionNotFoundError(error)) {
+                  taskContext.logger.info(
+                    `Task ${runContext.taskInstance.id} skipped: stream "${streamName}" was deleted`
+                  );
+                  return getDeleteTaskRunResult();
+                }
+
                 // Get connector info for error enrichment
                 const connector = await inferenceClient.getConnectorById(connectorId);
 

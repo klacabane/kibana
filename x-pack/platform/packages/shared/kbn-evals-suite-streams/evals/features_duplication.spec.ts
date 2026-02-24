@@ -13,7 +13,7 @@ import { identifyFeatures } from '@kbn/streams-ai';
 import { featuresPrompt } from '@kbn/streams-ai/src/features/prompt';
 import { uniqBy } from 'lodash';
 import objectHash from 'object-hash';
-import type { ElasticsearchClient } from '@kbn/core/server';
+import type { ElasticsearchClient, Logger } from '@kbn/core/server';
 import type { BoundInferenceClient } from '@kbn/inference-common';
 import { evaluate } from '../src/evaluate';
 import { FEATURES_DUPLICATION_DATASETS } from './features_duplication_datasets';
@@ -37,7 +37,7 @@ evaluate.describe('Streams features duplication (harness)', () => {
     streamName: string;
     runs: number;
     inferenceClient: BoundInferenceClient;
-    logger: any;
+    logger: Logger;
     sampleSize: number;
   }): Promise<{
     runs: Array<{
@@ -128,7 +128,7 @@ evaluate.describe('Streams features duplication (harness)', () => {
     return {
       name: 'llm_semantic_uniqueness',
       kind: 'LLM' as const,
-      evaluate: async ({ input, output }: any) => {
+      evaluate: async ({ input, output }: { input: { stream_name: string }; output: { runs?: Array<{ features: BaseFeature[] }> } }) => {
         const runs: Array<{ features: BaseFeature[] }> = output?.runs ?? [];
         const allFeatures = runs.flatMap((run) => run.features);
 
@@ -259,7 +259,7 @@ Method:
     return {
       name: 'llm_id_consistency',
       kind: 'LLM' as const,
-      evaluate: async ({ input, output }: any) => {
+      evaluate: async ({ input, output }: { input: { stream_name: string }; output: { runs?: Array<{ features: BaseFeature[] }> } }) => {
         const runs: Array<{ features: BaseFeature[] }> = output?.runs ?? [];
         const allFeatures = runs.flatMap((run) => run.features);
 
@@ -461,7 +461,7 @@ Method:
             to,
           });
 
-          await new Promise((resolve) => setTimeout(resolve, 3000));
+          await esClient.indices.refresh({ index: dataset.input.stream_name });
 
           await phoenixClient.runExperiment(
             {

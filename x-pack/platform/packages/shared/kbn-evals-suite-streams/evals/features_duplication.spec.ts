@@ -8,11 +8,10 @@
 import kbnDatemath from '@kbn/datemath';
 import { getSampleDocuments } from '@kbn/ai-tools';
 import { tags } from '@kbn/scout';
-import { isDuplicateFeature, type BaseFeature } from '@kbn/streams-schema';
+import { hasSameFingerprint, type BaseFeature } from '@kbn/streams-schema';
 import { identifyFeatures } from '@kbn/streams-ai';
 import { featuresPrompt } from '@kbn/streams-ai/src/features/prompt';
 import { uniqBy, uniqWith } from 'lodash';
-import objectHash from 'object-hash';
 import type { ElasticsearchClient, Logger } from '@kbn/core/server';
 import type { BoundInferenceClient } from '@kbn/inference-common';
 import { evaluate } from '../src/evaluate';
@@ -68,14 +67,6 @@ evaluate.describe('Streams features duplication (harness)', () => {
     }
 
     return { runs: outputs };
-  }
-
-  function featureFingerprint(feature: BaseFeature): string {
-    return objectHash({
-      type: feature.type,
-      subtype: feature.subtype,
-      properties: feature.properties,
-    });
   }
 
   const SEMANTIC_UNIQUENESS_OUTPUT_SCHEMA = {
@@ -148,7 +139,7 @@ evaluate.describe('Streams features duplication (harness)', () => {
         // so unique_by_fingerprint <= unique_by_id always holds.
         // If unique_by_fingerprint < unique_by_id, some features with different ids
         // have identical (type, subtype, properties) — a strong structural duplication signal.
-        const uniqueByFingerprint = uniqWith(featuresUniqueById, isDuplicateFeature).length;
+        const uniqueByFingerprint = uniqWith(featuresUniqueById, hasSameFingerprint).length;
 
         const compactUniqueFeatures = featuresUniqueById
           .map((feature) => ({
@@ -304,10 +295,10 @@ Method:
 
         // Split into trivially consistent (same fingerprint every time) and ambiguous (different fingerprints)
         const triviallyConsistent = multiOccurrenceEntries.filter(
-          ([, features]) => uniqBy(features, featureFingerprint).length === 1
+          ([, features]) => uniqWith(features, hasSameFingerprint).length === 1
         );
         const ambiguous = multiOccurrenceEntries.filter(
-          ([, features]) => uniqBy(features, featureFingerprint).length > 1
+          ([, features]) => uniqWith(features, hasSameFingerprint).length > 1
         );
 
         if (ambiguous.length === 0) {
@@ -320,7 +311,7 @@ Method:
         // Build a compact representation of the ambiguous groups for the LLM
         const idGroups = ambiguous.map(([id, features]) => ({
           id,
-          variants: uniqBy(features, featureFingerprint).map((f) => ({
+          variants: uniqWith(features, hasSameFingerprint).map((f) => ({
             type: f.type,
             subtype: f.subtype,
             title: f.title,
@@ -394,31 +385,17 @@ Method:
       // (same content, different ids). Id collisions (same id, different content across runs)
       // are a separate concern handled by the llm_id_consistency evaluator.
       const uniqueById = uniqBy(allFeatures, 'id');
+      const dedupedByFingerprint = uniqWith(uniqueById, hasSameFingerprint);
+      const uniqueByFingerprint = dedupedByFingerprint.length;
 
-      const featuresById = new Map(uniqueById.map((f) => [f.id, f]));
-      const fingerprintToIds = new Map<string, string[]>();
-      for (const feature of uniqueById) {
-        const fp = featureFingerprint(feature);
-        const ids = fingerprintToIds.get(fp) ?? [];
-        ids.push(feature.id);
-        fingerprintToIds.set(fp, ids);
-      }
-
-      const uniqueByFingerprint = [...fingerprintToIds.keys()].length;
-
-      // Groups of ids that share an identical fingerprint — these are structural duplicates
-      // the model generated with different ids but identical (type, subtype, properties).
-      const structuralDuplicateGroups = [...fingerprintToIds.values()]
-        .filter((ids) => ids.length > 1)
-        .map((ids) => {
-          const representative = featuresById.get(ids[0])!;
-          return {
-            ids,
-            type: representative.type,
-            subtype: representative.subtype,
-            properties: representative.properties,
-          };
-        });
+      const structuralDuplicateGroups = dedupedByFingerprint
+        .map((representative) => ({
+          ids: uniqueById.filter((f) => hasSameFingerprint(f, representative)).map((f) => f.id),
+          type: representative.type,
+          subtype: representative.subtype,
+          properties: representative.properties,
+        }))
+        .filter((group) => group.ids.length > 1);
 
       const missedDuplicates = uniqueById.length - uniqueByFingerprint;
 

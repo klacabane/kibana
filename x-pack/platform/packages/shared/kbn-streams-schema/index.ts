@@ -170,6 +170,7 @@ export {
   isFeature,
   isComputedFeature,
   isDuplicateFeature,
+  hasSameFingerprint,
   featureSchema,
   baseFeatureSchema,
   featureStatusSchema,

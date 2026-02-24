@@ -59,9 +59,13 @@ export function isComputedFeature(feature: BaseFeature): boolean {
   return (COMPUTED_FEATURE_TYPES as unknown as string[]).includes(feature.type);
 }
 
+export function hasSameFingerprint(feature: BaseFeature, other: BaseFeature): boolean {
+  return feature.type === other.type &&
+    feature.subtype === other.subtype &&
+    isEqual(feature.properties, other.properties)
+}
+
 export function isDuplicateFeature(feature: BaseFeature, other: BaseFeature): boolean {
   return feature.id.toLowerCase() === other.id.toLowerCase()
-    || (feature.type === other.type &&
-      feature.subtype === other.subtype &&
-      isEqual(feature.properties, other.properties))
+    || hasSameFingerprint(feature, other);
 }

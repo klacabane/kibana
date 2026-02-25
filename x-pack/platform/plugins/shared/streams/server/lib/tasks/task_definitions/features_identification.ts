@@ -11,6 +11,7 @@ import {
   type IdentifyFeaturesResult,
   type BaseFeature,
   isComputedFeature,
+  getStreamTypeFromDefinition,
 } from '@kbn/streams-schema';
 import { identifyFeatures, generateAllComputedFeatures } from '@kbn/streams-ai';
 import { getSampleDocuments } from '@kbn/ai-tools/src/tools/describe_dataset/get_sample_documents';
@@ -84,7 +85,8 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   size: 20,
                 });
 
-                const [{ features: inferredBaseFeatures }, computedFeatures] = await Promise.all([
+                const identifyFeaturesStart = Date.now();
+                const [{ features: inferredBaseFeatures, tokensUsed, durationMs }, computedFeatures] = await Promise.all([
                   identifyFeatures({
                     streamName: stream.name,
                     sampleDocuments,
@@ -92,7 +94,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                     logger: taskContext.logger.get('features_identification'),
                     signal: runContext.abortController.signal,
                     systemPrompt: featurePromptOverride,
-                  }),
+                  }).then(result => ({ ...result, durationMs: Date.now() - identifyFeaturesStart })),
                   generateAllComputedFeatures({
                     stream,
                     start,
@@ -108,16 +110,19 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 ];
 
                 const { hits: existingFeatures } = await featureClient.getFeatures(stream.name);
+
+                let newFeaturesCount = inferredBaseFeatures.length;
                 const now = Date.now();
                 const features = identifiedFeatures.map((feature) => {
                   const existing = featureClient.findDuplicateFeature({
                     existingFeatures,
                     feature,
                   });
-                  if (existing) {
-                    taskContext.logger.debug(
-                      `Overwriting feature with id [${
-                        feature.id
+                  const isComputed = isComputedFeature(feature);
+                  if (existing && !isComputed) {
+                    newFeaturesCount--;
+                    taskContext.logger.debug(() =>
+                      `Overwriting feature with id [${feature.id
                       }] since it already exists.\nExisting feature: ${JSON.stringify(
                         existing
                       )}\nNew feature: ${JSON.stringify(feature)}`
@@ -128,7 +133,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                     status: 'active' as const,
                     last_seen: new Date(now).toISOString(),
                     expires_at: new Date(now + MAX_FEATURE_AGE_MS).toISOString(),
-                    uuid: isComputedFeature(feature)
+                    uuid: isComputed
                       ? uuidv5(`${streamName}:${feature.id}`, uuidv5.DNS)
                       : existing?.uuid ?? uuid(),
                   };
@@ -144,9 +149,19 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   { connectorId, start, end, streamName },
                   { features }
                 );
+
+                taskContext.telemetry.trackFeaturesIdentified({
+                  duration_ms: durationMs,
+                  stream_name: stream.name,
+                  stream_type: getStreamTypeFromDefinition(stream),
+                  input_tokens_used: tokensUsed.prompt,
+                  output_tokens_used: tokensUsed.completion,
+                  inferred_total_count: inferredBaseFeatures.length,
+                  inferred_dedup_count: newFeaturesCount,
+                });
               } catch (error) {
                 if (isDefinitionNotFoundError(error)) {
-                  taskContext.logger.debug(
+                  taskContext.logger.debug(() =>
                     `Stream ${streamName} was deleted before features identification task started, skipping`
                   );
                   return getDeleteTaskRunResult();

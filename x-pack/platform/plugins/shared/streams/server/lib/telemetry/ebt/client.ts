@@ -41,13 +41,13 @@ const LATENCY_TRACKING_ENDPOINT_ALLOW_LIST = [
 ];
 
 export class EbtTelemetryClient {
-  constructor(private readonly analytics: AnalyticsServiceSetup) { }
+  constructor(private readonly analytics: AnalyticsServiceSetup) {}
 
   public startTrackingEndpointLatency(
     props: Pick<StreamEndpointLatencyProps, 'name' | 'endpoint'>
   ) {
     if (!LATENCY_TRACKING_ENDPOINT_ALLOW_LIST.includes(props.endpoint)) {
-      return () => { };
+      return () => {};
     }
     const startTime = Date.now();
     return () => {

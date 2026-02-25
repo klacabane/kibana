@@ -72,7 +72,6 @@ interface StreamsFeaturesIdentifiedProps {
   stream_type: StreamType;
 }
 
-
 export {
   type StreamEndpointLatencyProps,
   type StreamsStateErrorProps,

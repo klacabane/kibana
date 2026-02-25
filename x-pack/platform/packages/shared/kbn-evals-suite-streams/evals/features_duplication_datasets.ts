@@ -24,7 +24,7 @@ export const FEATURES_DUPLICATION_DATASETS: FeaturesDuplicationEvaluationDataset
       'Indexes one synthtrace LogHub system into a dedicated stream, then runs features identification multiple times to measure duplicated features across runs.',
     input: {
       scenario: 'sample_logs',
-      stream_name: 'logs',
+      stream_name: 'logs.ecs',
       sample_document_count: 20,
       runs: 5,
       scenarioOpts: {

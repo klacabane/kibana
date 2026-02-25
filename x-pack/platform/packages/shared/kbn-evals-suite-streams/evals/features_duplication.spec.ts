@@ -390,7 +390,9 @@ Method:
 
       const structuralDuplicateGroups = dedupedByFingerprint
         .map((representative) => ({
-          ids: uniqueById.filter((f) => hasSameFingerprint(f, representative)).map((f) => f.id.toLowerCase()),
+          ids: uniqueById
+            .filter((f) => hasSameFingerprint(f, representative))
+            .map((f) => f.id.toLowerCase()),
           type: representative.type,
           subtype: representative.subtype,
           properties: representative.properties,

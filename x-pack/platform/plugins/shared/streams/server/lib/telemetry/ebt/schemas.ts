@@ -301,6 +301,12 @@ const streamsFeaturesIdentifiedSchema: RootSchema<StreamsFeaturesIdentifiedProps
       description: 'The number of output tokens used for the identification request',
     },
   },
+  total_tokens_used: {
+    type: 'long',
+    _meta: {
+      description: 'The total number of tokens used for the identification request',
+    },
+  },
   duration_ms: {
     type: 'long',
     _meta: {

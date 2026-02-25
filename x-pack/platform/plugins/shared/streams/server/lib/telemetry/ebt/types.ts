@@ -66,6 +66,7 @@ interface StreamsFeaturesIdentifiedProps {
   inferred_dedup_count: number;
   input_tokens_used: number;
   output_tokens_used: number;
+  total_tokens_used: number;
   duration_ms: number;
   stream_name: string;
   stream_type: StreamType;

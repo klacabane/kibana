@@ -156,6 +156,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   stream_type: getStreamTypeFromDefinition(stream),
                   input_tokens_used: tokensUsed.prompt,
                   output_tokens_used: tokensUsed.completion,
+                  total_tokens_used: tokensUsed.total,
                   inferred_total_count: inferredBaseFeatures.length,
                   inferred_dedup_count: newFeaturesCount,
                 });

@@ -133,7 +133,7 @@ evaluate.describe('Streams features duplication (harness)', () => {
           return { score: 1, explanation: 'No features to evaluate' };
         }
 
-        const featuresUniqueById = uniqBy(allFeatures, 'id');
+        const featuresUniqueById = uniqBy(allFeatures, (feature) => feature.id.toLowerCase());
         const uniqueById = featuresUniqueById.length;
         // Fingerprint uniqueness computed over the already-deduplicated-by-id set,
         // so unique_by_fingerprint <= unique_by_id always holds.
@@ -143,7 +143,7 @@ evaluate.describe('Streams features duplication (harness)', () => {
 
         const compactUniqueFeatures = featuresUniqueById
           .map((feature) => ({
-            id: feature.id,
+            id: feature.id.toLowerCase(),
             type: feature.type,
             subtype: feature.subtype,
             title: feature.title,
@@ -384,13 +384,13 @@ Method:
       // missed_duplicates unambiguous: it simply equals unique_by_id - unique_by_fingerprint
       // (same content, different ids). Id collisions (same id, different content across runs)
       // are a separate concern handled by the llm_id_consistency evaluator.
-      const uniqueById = uniqBy(allFeatures, 'id');
+      const uniqueById = uniqBy(allFeatures, (feature) => feature.id.toLowerCase());
       const dedupedByFingerprint = uniqWith(uniqueById, hasSameFingerprint);
       const uniqueByFingerprint = dedupedByFingerprint.length;
 
       const structuralDuplicateGroups = dedupedByFingerprint
         .map((representative) => ({
-          ids: uniqueById.filter((f) => hasSameFingerprint(f, representative)).map((f) => f.id),
+          ids: uniqueById.filter((f) => hasSameFingerprint(f, representative)).map((f) => f.id.toLowerCase()),
           type: representative.type,
           subtype: representative.subtype,
           properties: representative.properties,

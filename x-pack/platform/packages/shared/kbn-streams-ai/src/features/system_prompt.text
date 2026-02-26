@@ -10,7 +10,7 @@ Every feature you output MUST include ALL required fields:
 - `description` (string): a summary of what the feature represents—include role, context, dependencies and how it fits in the system; one to four sentences so the description is informative and useful on its own
 - `properties` (object): stable, low-cardinality key facts for deduplication (**MUST NOT be empty**; if you cannot provide at least one stable identifying property, do not emit the feature)
 - `confidence` (number): 0–100
-- `evidence` (array of strings): supporting evidence from logs (2–5 items)
+- `evidence` (array of strings): supporting evidence from logs (2–5 items). When sample_documents include a document `_id` and the evidence is attributable to a specific document, include the `_id` in the evidence string.
 - `tags` (array of strings): descriptive tags
 - `meta` (object): supplementary information that doesn't fit in `properties` — use for high-cardinality data, contextual notes, or interesting observations (can be `{}`)
 
@@ -131,6 +131,8 @@ Accept features with confidence ≥ 30 if evidence supports them.
 Evidence requirements:
 - Provide 2–5 short, specific evidence strings per feature
 - Prefer stable `field.path=value` snippets when possible; otherwise short direct quotes
+- When the supporting evidence is clearly from a specific sample document and a document `_id` is available in `sample_documents`, include it to aid traceability. Use a compact prefix format like `_id=<DOCUMENT_ID> field.path=value` or `_id=<DOCUMENT_ID> "<short quote>"`.
+- If the evidence is aggregate/system-wide (not attributable to one document) or the `_id` is not available, omit the `_id`.
 - Evidence must directly support the feature claim
 
 Version formatting rules (important for vulnerability analysis):
@@ -155,9 +157,9 @@ Version formatting rules (important for vulnerability analysis):
   },
   "confidence": 88,
   "evidence": [
-    "service.name=api-service",
-    "process.runtime.name=OpenJDK Runtime Environment",
-    "http.method=GET http.url=/api/users http.status_code=200"
+    "_id=7f3a9b2 service.name=api-service",
+    "_id=7f3a9b2 process.runtime.name=OpenJDK Runtime Environment",
+    "_id=2c91de8 http.method=GET http.url=/api/users http.status_code=200"
   ],
   "tags": ["entity", "service", "java"],
   "meta": {
@@ -182,9 +184,9 @@ Version formatting rules (important for vulnerability analysis):
   },
   "confidence": 82,
   "evidence": [
-    "db.system=postgresql",
-    "db.name=users",
-    "db.statement=SELECT * FROM users WHERE id=$1"
+    "_id=91aa0c1 db.system=postgresql",
+    "_id=91aa0c1 db.name=users",
+    "_id=4b0d2fe db.statement=SELECT * FROM users WHERE id=$1"
   ],
   "tags": ["entity", "database", "postgresql"],
   "meta": {
@@ -207,9 +209,9 @@ Version formatting rules (important for vulnerability analysis):
   },
   "confidence": 92,
   "evidence": [
-    "cloud.provider=aws",
-    "cloud.region=eu-west-1",
-    "cloud.availability_zone=eu-west-1a"
+    "_id=8a1f0c2 cloud.provider=aws",
+    "_id=8a1f0c2 cloud.region=eu-west-1",
+    "_id=8a1f0c2 cloud.availability_zone=eu-west-1a"
   ],
   "tags": ["infrastructure", "cloud"],
   "meta": {
@@ -234,8 +236,8 @@ Version formatting rules (important for vulnerability analysis):
   },
   "confidence": 95,
   "evidence": [
-    "host.os.name=Ubuntu",
-    "host.os.version=20.04.6 LTS (Focal Fossa)"
+    "_id=61e9baf host.os.name=Ubuntu",
+    "_id=61e9baf host.os.version=20.04.6 LTS (Focal Fossa)"
   ],
   "tags": ["infrastructure", "os"],
   "meta": {
@@ -258,8 +260,8 @@ Version formatting rules (important for vulnerability analysis):
   },
   "confidence": 90,
   "evidence": [
-    "jar=log4j-core-2.14.1.jar",
-    "logger=org.apache.logging.log4j"
+    "_id=9d2c1aa jar=log4j-core-2.14.1.jar",
+    "_id=9d2c1aa logger=org.apache.logging.log4j"
   ],
   "tags": ["technology", "library", "logging"],
   "meta": {
@@ -281,8 +283,8 @@ Version formatting rules (important for vulnerability analysis):
   },
   "confidence": 45,
   "evidence": [
-    "Traceback (most recent call last):",
-    "File \"/app/main.py\", line 42, in handle_request"
+    "_id=3a77c10 \"Traceback (most recent call last):\"",
+    "_id=3a77c10 \"File \\\"/app/main.py\\\", line 42, in handle_request\""
   ],
   "tags": ["technology", "inferred"],
   "meta": {
@@ -306,8 +308,8 @@ Version formatting rules (important for vulnerability analysis):
   },
   "confidence": 85,
   "evidence": [
-    "service.name=api-service http.url=/users http.status_code=200 peer.service=user-service",
-    "upstream=user-service:8080 request=GET /users"
+    "_id=b7aa021 service.name=api-service http.url=/users http.status_code=200 peer.service=user-service",
+    "_id=cc12d90 upstream=user-service:8080 request=GET /users"
   ],
   "tags": ["dependency", "http"],
   "meta": {

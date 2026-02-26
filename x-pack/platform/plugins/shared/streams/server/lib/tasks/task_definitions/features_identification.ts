@@ -39,7 +39,10 @@ export function getFeaturesIdentificationTaskId(streamName: string) {
   return `${FEATURES_IDENTIFICATION_TASK_TYPE}_${streamName}`;
 }
 
-function limitArrayFieldValues(fields: Record<string, unknown> | undefined, limit: number = 3): Record<string, unknown> | undefined {
+function limitArrayFieldValues(
+  fields: Record<string, unknown> | undefined,
+  limit: number = 3
+): Record<string, unknown> | undefined {
   if (!fields) return fields;
 
   return Object.fromEntries(
@@ -103,7 +106,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 const [{ features: inferredBaseFeatures }, computedFeatures] = await Promise.all([
                   identifyFeatures({
                     streamName: stream.name,
-                    sampleDocuments: sampleDocuments.map(hit => ({
+                    sampleDocuments: sampleDocuments.map((hit) => ({
                       _id: hit._id,
                       fields: limitArrayFieldValues(hit.fields),
                     })),
@@ -135,7 +138,8 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   });
                   if (existing) {
                     taskContext.logger.debug(
-                      `Overwriting feature with id [${feature.id
+                      `Overwriting feature with id [${
+                        feature.id
                       }] since it already exists.\nExisting feature: ${JSON.stringify(
                         existing
                       )}\nNew feature: ${JSON.stringify(feature)}`

@@ -39,6 +39,22 @@ export function getFeaturesIdentificationTaskId(streamName: string) {
   return `${FEATURES_IDENTIFICATION_TASK_TYPE}_${streamName}`;
 }
 
+function limitArrayFieldValues(fields: Record<string, unknown> | undefined, limit: number = 3): Record<string, unknown> | undefined {
+  if (!fields) return fields;
+
+  return Object.fromEntries(
+    Object.entries(fields).map(([key, value]) => {
+      if (!Array.isArray(value)) return [key, value];
+
+      if (value.length === 1) return [key, value[0]];
+      if (value.length <= limit) return [key, value];
+
+      const remaining = value.length - limit;
+      return [key, [...value.slice(0, limit), `+${remaining} more`]];
+    })
+  );
+}
+
 export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext) {
   return {
     [FEATURES_IDENTIFICATION_TASK_TYPE]: {
@@ -87,7 +103,10 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 const [{ features: inferredBaseFeatures }, computedFeatures] = await Promise.all([
                   identifyFeatures({
                     streamName: stream.name,
-                    sampleDocuments,
+                    sampleDocuments: sampleDocuments.map(hit => ({
+                      _id: hit._id,
+                      fields: limitArrayFieldValues(hit.fields),
+                    })),
                     inferenceClient: boundInferenceClient,
                     logger: taskContext.logger.get('features_identification'),
                     signal: runContext.abortController.signal,
@@ -116,8 +135,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   });
                   if (existing) {
                     taskContext.logger.debug(
-                      `Overwriting feature with id [${
-                        feature.id
+                      `Overwriting feature with id [${feature.id
                       }] since it already exists.\nExisting feature: ${JSON.stringify(
                         existing
                       )}\nNew feature: ${JSON.stringify(feature)}`

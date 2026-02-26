@@ -50,10 +50,22 @@ const featuresSchema = {
           evidence: {
             type: 'array',
             items: {
-              type: 'string',
+              type: 'object',
+              properties: {
+                text: {
+                  type: 'string',
+                  description:
+                    'The evidence text. Can be a short sentence or a `key: value` string.',
+                },
+                document_ids: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'The _id values of the source documents that support this evidence.',
+                },
+              },
+              required: ['text'],
             },
-            description:
-              'The evidences that support the feature. Can be a short sentence or a `key: value` string.',
+            description: 'The evidences that support the feature.',
           },
           tags: {
             type: 'array',

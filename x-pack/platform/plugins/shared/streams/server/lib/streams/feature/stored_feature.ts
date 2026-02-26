@@ -34,7 +34,14 @@ export const storedFeatureSchema = z.object({
   [STREAM_NAME]: z.string(),
   [FEATURE_PROPERTIES]: z.record(z.string(), z.any()),
   [FEATURE_CONFIDENCE]: z.number(),
-  [FEATURE_EVIDENCE]: z.array(z.string()).optional(),
+  [FEATURE_EVIDENCE]: z
+    .array(
+      z.object({
+        text: z.string(),
+        document_ids: z.array(z.string()).optional(),
+      })
+    )
+    .optional(),
   [FEATURE_STATUS]: featureStatusSchema,
   [FEATURE_LAST_SEEN]: z.string(),
   [FEATURE_TAGS]: z.array(z.string()).optional(),

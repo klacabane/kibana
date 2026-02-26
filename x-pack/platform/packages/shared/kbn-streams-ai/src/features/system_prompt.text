@@ -10,7 +10,7 @@ Every feature you output MUST include ALL required fields:
 - `description` (string): a summary of what the feature represents—include role, context, dependencies and how it fits in the system; one to four sentences so the description is informative and useful on its own
 - `properties` (object): stable, low-cardinality key facts for deduplication (**MUST NOT be empty**; if you cannot provide at least one stable identifying property, do not emit the feature)
 - `confidence` (number): 0–100
-- `evidence` (array of strings): supporting evidence from logs (2–5 items)
+- `evidence` (array of objects): supporting evidence from logs (2–5 items). Each object has `text` (the evidence string) and optionally `document_ids` (array of `_id` values from the source documents that contain this evidence)
 - `tags` (array of strings): descriptive tags
 - `meta` (object): supplementary information that doesn't fit in `properties` — use for high-cardinality data, contextual notes, or interesting observations (can be `{}`)
 
@@ -129,8 +129,9 @@ Accept features with confidence ≥ 30 if evidence supports them.
 ## Evidence & Versions
 
 Evidence requirements:
-- Provide 2–5 short, specific evidence strings per feature
-- Prefer stable `field.path=value` snippets when possible; otherwise short direct quotes
+- Provide 2–5 evidence items per feature, each as an object with `text` and optionally `document_ids`
+- `text`: short, specific evidence string — prefer stable `field.path=value` snippets when possible; otherwise short direct quotes
+- `document_ids`: array of `_id` values from the source documents that contain this evidence. Include this when the evidence can be traced to specific documents in the sample_documents input. Omit when evidence is synthesized across many documents or cannot be pinpointed to specific sources.
 - Evidence must directly support the feature claim
 
 Version formatting rules (important for vulnerability analysis):
@@ -155,9 +156,9 @@ Version formatting rules (important for vulnerability analysis):
   },
   "confidence": 88,
   "evidence": [
-    "service.name=api-service",
-    "process.runtime.name=OpenJDK Runtime Environment",
-    "http.method=GET http.url=/api/users http.status_code=200"
+    { "text": "service.name=api-service", "document_ids": ["doc-1", "doc-2", "doc-3"] },
+    { "text": "process.runtime.name=OpenJDK Runtime Environment", "document_ids": ["doc-1"] },
+    { "text": "http.method=GET http.url=/api/users http.status_code=200", "document_ids": ["doc-2"] }
   ],
   "tags": ["entity", "service", "java"],
   "meta": {
@@ -182,9 +183,9 @@ Version formatting rules (important for vulnerability analysis):
   },
   "confidence": 82,
   "evidence": [
-    "db.system=postgresql",
-    "db.name=users",
-    "db.statement=SELECT * FROM users WHERE id=$1"
+    { "text": "db.system=postgresql", "document_ids": ["doc-5", "doc-6"] },
+    { "text": "db.name=users", "document_ids": ["doc-5", "doc-6"] },
+    { "text": "db.statement=SELECT * FROM users WHERE id=$1", "document_ids": ["doc-5"] }
   ],
   "tags": ["entity", "database", "postgresql"],
   "meta": {
@@ -207,9 +208,9 @@ Version formatting rules (important for vulnerability analysis):
   },
   "confidence": 92,
   "evidence": [
-    "cloud.provider=aws",
-    "cloud.region=eu-west-1",
-    "cloud.availability_zone=eu-west-1a"
+    { "text": "cloud.provider=aws", "document_ids": ["doc-1", "doc-2", "doc-3", "doc-4"] },
+    { "text": "cloud.region=eu-west-1", "document_ids": ["doc-1", "doc-2"] },
+    { "text": "cloud.availability_zone=eu-west-1a", "document_ids": ["doc-1"] }
   ],
   "tags": ["infrastructure", "cloud"],
   "meta": {
@@ -234,8 +235,8 @@ Version formatting rules (important for vulnerability analysis):
   },
   "confidence": 95,
   "evidence": [
-    "host.os.name=Ubuntu",
-    "host.os.version=20.04.6 LTS (Focal Fossa)"
+    { "text": "host.os.name=Ubuntu", "document_ids": ["doc-1", "doc-2", "doc-3"] },
+    { "text": "host.os.version=20.04.6 LTS (Focal Fossa)", "document_ids": ["doc-1"] }
   ],
   "tags": ["infrastructure", "os"],
   "meta": {
@@ -258,8 +259,8 @@ Version formatting rules (important for vulnerability analysis):
   },
   "confidence": 90,
   "evidence": [
-    "jar=log4j-core-2.14.1.jar",
-    "logger=org.apache.logging.log4j"
+    { "text": "jar=log4j-core-2.14.1.jar", "document_ids": ["doc-7"] },
+    { "text": "logger=org.apache.logging.log4j", "document_ids": ["doc-7", "doc-8"] }
   ],
   "tags": ["technology", "library", "logging"],
   "meta": {
@@ -281,8 +282,8 @@ Version formatting rules (important for vulnerability analysis):
   },
   "confidence": 45,
   "evidence": [
-    "Traceback (most recent call last):",
-    "File \"/app/main.py\", line 42, in handle_request"
+    { "text": "Traceback (most recent call last):", "document_ids": ["doc-10"] },
+    { "text": "File \"/app/main.py\", line 42, in handle_request", "document_ids": ["doc-10"] }
   ],
   "tags": ["technology", "inferred"],
   "meta": {
@@ -306,8 +307,8 @@ Version formatting rules (important for vulnerability analysis):
   },
   "confidence": 85,
   "evidence": [
-    "service.name=api-service http.url=/users http.status_code=200 peer.service=user-service",
-    "upstream=user-service:8080 request=GET /users"
+    { "text": "service.name=api-service http.url=/users http.status_code=200 peer.service=user-service", "document_ids": ["doc-2", "doc-3"] },
+    { "text": "upstream=user-service:8080 request=GET /users", "document_ids": ["doc-4"] }
   ],
   "tags": ["dependency", "http"],
   "meta": {

@@ -130,21 +130,35 @@ function getAllStringValues(doc: Record<string, unknown>): string[] {
  *    least one pair matches a document field value.
  * 2. Direct quote evidence: checks if the text appears as a substring in any
  *    string value across all document fields.
+ *
+ * If documentIds is provided and non-empty, the check is scoped to only those
+ * specific documents (matched by `_id` field). Otherwise checks all documents.
  */
-function isEvidenceGrounded(evidence: string, documents: Array<Record<string, unknown>>): boolean {
-  // Direct quote: check against all string values in all documents
-  const matchesStringValue = documents.some((doc) => {
+function isEvidenceGrounded(
+  evidenceText: string,
+  documents: Array<Record<string, unknown>>,
+  documentIds?: string[]
+): boolean {
+  const targetDocs =
+    documentIds && documentIds.length > 0
+      ? documents.filter((doc) => documentIds.includes(doc._id as string))
+      : documents;
+
+  if (targetDocs.length === 0) {
+    return false;
+  }
+
+  const matchesStringValue = targetDocs.some((doc) => {
     const allValues = getAllStringValues(doc);
-    return allValues.some((val) => val.includes(evidence) || evidence.includes(val));
+    return allValues.some((val) => val.includes(evidenceText) || evidenceText.includes(val));
   });
   if (matchesStringValue) {
     return true;
   }
 
-  const kvPairs = parseKeyValuePairs(evidence);
+  const kvPairs = parseKeyValuePairs(evidenceText);
   if (kvPairs.length > 0) {
-    // field=value: at least one pair must match a document field
-    const matchesDocumentKey = documents.some((doc) =>
+    const matchesDocumentKey = targetDocs.some((doc) =>
       kvPairs.some(({ key, value }) => {
         const docValue = getNestedValue(doc, key);
         return docValue !== undefined && String(docValue).includes(value);
@@ -159,9 +173,12 @@ function isEvidenceGrounded(evidence: string, documents: Array<Record<string, un
 }
 
 /**
- * Checks that every evidence string in every feature is grounded in the input
+ * Checks that every evidence item in every feature is grounded in the input
  * documents — either as a `field.path=value` snippet matching a document field,
  * or as a direct quote appearing in any string value.
+ *
+ * Also validates that any `document_ids` references point to documents that
+ * actually exist in the input (matched by `_id` field).
  */
 const evidenceGroundingEvaluator = {
   name: 'evidence_grounding',
@@ -169,19 +186,32 @@ const evidenceGroundingEvaluator = {
   evaluate: async ({ input, output }: CodeEvaluatorParams) => {
     const features = output?.features ?? [];
     const documents = input.sample_documents;
+    const validDocIds = new Set(documents.map((doc) => doc._id as string).filter(Boolean));
 
     let totalEvidence = 0;
     let groundedEvidence = 0;
     const ungroundedItems: string[] = [];
+    const invalidDocIdRefs: string[] = [];
 
     for (const feature of features) {
       const evidenceList = feature.evidence ?? [];
-      for (const evidence of evidenceList) {
+      for (const evidenceItem of evidenceList) {
         totalEvidence++;
-        if (isEvidenceGrounded(evidence, documents)) {
+        const { text, document_ids: documentIds } = evidenceItem;
+
+        if (documentIds && documentIds.length > 0) {
+          const missingIds = documentIds.filter((id) => !validDocIds.has(id));
+          if (missingIds.length > 0) {
+            invalidDocIdRefs.push(
+              `Feature "${feature.id}": document_ids [${missingIds.join(', ')}] not found in input`
+            );
+          }
+        }
+
+        if (isEvidenceGrounded(text, documents, documentIds)) {
           groundedEvidence++;
         } else {
-          ungroundedItems.push(`Feature "${feature.id}": "${evidence}"`);
+          ungroundedItems.push(`Feature "${feature.id}": "${text}"`);
         }
       }
     }
@@ -196,18 +226,17 @@ const evidenceGroundingEvaluator = {
       };
     }
 
-    const score = groundedEvidence / totalEvidence;
+    const allIssues = [...ungroundedItems, ...invalidDocIdRefs];
+    const issueCount = ungroundedItems.length + (invalidDocIdRefs.length > 0 ? 1 : 0);
+    const score = Math.max(0, (groundedEvidence - invalidDocIdRefs.length * 0.5) / totalEvidence);
+
     return {
       score,
       explanation:
-        ungroundedItems.length > 0
-          ? `${
-              ungroundedItems.length
-            }/${totalEvidence} evidence strings not grounded: ${ungroundedItems
-              .slice(0, 3)
-              .join('; ')}`
-          : `All ${totalEvidence} evidence strings are grounded in input documents`,
-      details: { totalEvidence, groundedEvidence, ungroundedItems },
+        allIssues.length > 0
+          ? `${issueCount} issues found: ${allIssues.slice(0, 3).join('; ')}`
+          : `All ${totalEvidence} evidence items are grounded in input documents`,
+      details: { totalEvidence, groundedEvidence, ungroundedItems, invalidDocIdRefs },
     };
   },
 };
@@ -336,12 +365,55 @@ const typeAssertionsEvaluator = {
   },
 };
 
+/**
+ * Tracks the percentage of evidence items that include document_ids.
+ * This is an informational metric (score is always 1) to monitor adoption
+ * of the new document_ids feature in LLM outputs.
+ */
+const evidenceDocumentIdCoverageEvaluator = {
+  name: 'evidence_document_id_coverage',
+  kind: 'CODE' as const,
+  evaluate: async ({ output }: CodeEvaluatorParams) => {
+    const features = output?.features ?? [];
+
+    let totalEvidence = 0;
+    let evidenceWithDocIds = 0;
+
+    for (const feature of features) {
+      const evidenceList = feature.evidence ?? [];
+      for (const evidenceItem of evidenceList) {
+        totalEvidence++;
+        if (evidenceItem.document_ids && evidenceItem.document_ids.length > 0) {
+          evidenceWithDocIds++;
+        }
+      }
+    }
+
+    if (totalEvidence === 0) {
+      return {
+        score: 1,
+        explanation: 'No evidence items to measure coverage',
+        details: { totalEvidence: 0, evidenceWithDocIds: 0, coveragePercent: 0 },
+      };
+    }
+
+    const coveragePercent = Math.round((evidenceWithDocIds / totalEvidence) * 100);
+
+    return {
+      score: 1,
+      explanation: `${evidenceWithDocIds}/${totalEvidence} evidence items (${coveragePercent}%) include document_ids`,
+      details: { totalEvidence, evidenceWithDocIds, coveragePercent },
+    };
+  },
+};
+
 const CODE_EVALUATORS = [
   typeValidationEvaluator,
   evidenceGroundingEvaluator,
   featureCountEvaluator,
   confidenceBoundsEvaluator,
   typeAssertionsEvaluator,
+  evidenceDocumentIdCoverageEvaluator,
 ];
 
 evaluate.describe(

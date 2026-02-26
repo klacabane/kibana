@@ -33,7 +33,14 @@ export const baseFeatureSchema = z.object({
   description: z.string(),
   properties: z.record(z.string(), z.unknown()),
   confidence: z.number().min(0).max(100),
-  evidence: z.array(z.string()).optional(),
+  evidence: z
+    .array(
+      z.object({
+        text: z.string(),
+        document_ids: z.array(z.string()).optional(),
+      })
+    )
+    .optional(),
   tags: z.array(z.string()).optional(),
   meta: z.record(z.string(), z.any()).optional(),
 });

@@ -220,14 +220,14 @@ export function FeatureDetailsFlyout({
           <EuiFlexItem>
             <InfoPanel title={EVIDENCE_LABEL}>
               {evidence.length > 0 ? (
-                evidence.map((item: string, index: number) => (
+                evidence.map((item, index) => (
                   <React.Fragment key={index}>
                     <EuiFlexGroup gutterSize="s" alignItems="flexStart" responsive={false}>
                       <EuiFlexItem grow={false}>
                         <EuiHealth color="subdued" />
                       </EuiFlexItem>
                       <EuiFlexItem>
-                        <EuiText size="s">{item}</EuiText>
+                        <EuiText size="s">{item.text}</EuiText>
                       </EuiFlexItem>
                     </EuiFlexGroup>
                     {index < evidence.length - 1 && <EuiHorizontalRule margin="m" />}

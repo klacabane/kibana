@@ -333,7 +333,7 @@ const streamsFeaturesIdentifiedSchema: RootSchema<StreamsFeaturesIdentifiedProps
   success: {
     type: 'boolean',
     _meta: {
-      description: 'Whether the pipeline suggestion was generated successfully',
+      description: 'Whether the features identification completed successfully',
     },
   },
 };

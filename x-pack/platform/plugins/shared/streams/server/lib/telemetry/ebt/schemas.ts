@@ -330,10 +330,10 @@ const streamsFeaturesIdentifiedSchema: RootSchema<StreamsFeaturesIdentifiedProps
       description: 'The name of the Stream',
     },
   },
-  success: {
-    type: 'boolean',
+  state: {
+    type: 'keyword',
     _meta: {
-      description: 'Whether the features identification completed successfully',
+      description: 'The state of the features identification task (success, failure, or cancelled)',
     },
   },
 };

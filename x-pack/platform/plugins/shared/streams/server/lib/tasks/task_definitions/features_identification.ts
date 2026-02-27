@@ -66,7 +66,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 total_tokens_used: 0,
                 inferred_total_count: 0,
                 inferred_dedup_count: 0,
-                success: false,
+                state: 'success',
               };
 
               const {
@@ -184,7 +184,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   inferred_total_count: inferredBaseFeatures.length,
                   inferred_dedup_count: newFeaturesCount,
                   total_duration_ms: Date.now() - taskStart,
-                  success: true,
+                  state: 'success',
                 });
               } catch (error) {
                 if (isDefinitionNotFoundError(error)) {
@@ -209,6 +209,11 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   taskContext.logger.debug(
                     () => `Task ${runContext.taskInstance.id} was canceled: ${errorMessage}`
                   );
+                  taskContext.telemetry.trackFeaturesIdentified({
+                    ...telemetryProps,
+                    total_duration_ms: Date.now() - taskStart,
+                    state: 'cancelled',
+                  });
                   return getDeleteTaskRunResult();
                 }
 
@@ -226,7 +231,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 taskContext.telemetry.trackFeaturesIdentified({
                   ...telemetryProps,
                   total_duration_ms: Date.now() - taskStart,
-                  success: false,
+                  state: 'failure',
                 });
 
                 return getDeleteTaskRunResult();

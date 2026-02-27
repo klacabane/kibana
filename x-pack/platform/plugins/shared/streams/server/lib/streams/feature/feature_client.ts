@@ -27,6 +27,7 @@ import {
   FEATURE_TAGS,
   FEATURE_META,
   FEATURE_EXPIRES_AT,
+  FEATURE_EVIDENCE_SOURCES,
 } from './fields';
 import type { FeatureStorageSettings } from './storage_settings';
 import type { StoredFeature } from './stored_feature';
@@ -48,7 +49,7 @@ export class FeatureClient {
     private readonly clients: {
       storageClient: IStorageClient<FeatureStorageSettings, StoredFeature>;
     }
-  ) {}
+  ) { }
 
   async clean() {
     await this.clients.storageClient.clean();
@@ -201,18 +202,18 @@ export class FeatureClient {
     const validDeleteIds =
       deleteIds.length > 0
         ? new Set(
-            (
-              await this.clients.storageClient.search({
-                size: deleteIds.length,
-                track_total_hits: false,
-                query: {
-                  bool: {
-                    filter: [{ terms: { _id: deleteIds } }, ...termQuery(STREAM_NAME, stream)],
-                  },
+          (
+            await this.clients.storageClient.search({
+              size: deleteIds.length,
+              track_total_hits: false,
+              query: {
+                bool: {
+                  filter: [{ terms: { _id: deleteIds } }, ...termQuery(STREAM_NAME, stream)],
                 },
-              })
-            ).hits.hits.flatMap((hit) => hit._id ?? [])
-          )
+              },
+            })
+          ).hits.hits.flatMap((hit) => hit._id ?? [])
+        )
         : new Set<string>();
 
     return operations.filter(
@@ -241,6 +242,7 @@ function toStorage(stream: string, feature: Feature): StoredFeature {
     [FEATURE_PROPERTIES]: feature.properties,
     [FEATURE_CONFIDENCE]: feature.confidence,
     [FEATURE_EVIDENCE]: feature.evidence,
+    [FEATURE_EVIDENCE_SOURCES]: feature.evidence_sources,
     [FEATURE_STATUS]: feature.status,
     [FEATURE_LAST_SEEN]: feature.last_seen,
     [FEATURE_TAGS]: feature.tags,
@@ -262,6 +264,7 @@ function fromStorage(feature: StoredFeature): Feature {
     properties: feature[FEATURE_PROPERTIES],
     confidence: feature[FEATURE_CONFIDENCE],
     evidence: feature[FEATURE_EVIDENCE],
+    evidence_sources: feature[FEATURE_EVIDENCE_SOURCES],
     status: feature[FEATURE_STATUS],
     last_seen: feature[FEATURE_LAST_SEEN],
     tags: feature[FEATURE_TAGS],

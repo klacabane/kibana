@@ -26,7 +26,7 @@ import { PromptsConfigService } from '../../saved_objects/significant_events/pro
 import { cancellableTask } from '../cancellable_task';
 import { MAX_FEATURE_AGE_MS } from '../../streams/feature/feature_client';
 import { isDefinitionNotFoundError } from '../../streams/errors/definition_not_found_error';
-import { StreamsFeaturesIdentifiedProps } from '../../telemetry';
+import type { StreamsFeaturesIdentifiedProps } from '../../telemetry';
 
 export interface FeaturesIdentificationTaskParams {
   connectorId: string;
@@ -103,10 +103,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 });
 
                 const identifyFeaturesStart = Date.now();
-                const [
-                  { features: inferredBaseFeatures },
-                  computedFeatures,
-                ] = await Promise.all([
+                const [{ features: inferredBaseFeatures }, computedFeatures] = await Promise.all([
                   identifyFeatures({
                     streamName: stream.name,
                     sampleDocuments,
@@ -114,14 +111,17 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                     logger: taskContext.logger.get('features_identification'),
                     signal: runContext.abortController.signal,
                     systemPrompt: featurePromptOverride,
-                  }).then((result) => {
-                    telemetryProps.input_tokens_used = result.tokensUsed.prompt;
-                    telemetryProps.output_tokens_used = result.tokensUsed.completion;
-                    telemetryProps.total_tokens_used = result.tokensUsed.total;
-                    return result;
-                  }).finally(() => {
-                    telemetryProps.identification_duration_ms = Date.now() - identifyFeaturesStart;
-                  }),
+                  })
+                    .then((result) => {
+                      telemetryProps.input_tokens_used = result.tokensUsed.prompt;
+                      telemetryProps.output_tokens_used = result.tokensUsed.completion;
+                      telemetryProps.total_tokens_used = result.tokensUsed.total;
+                      return result;
+                    })
+                    .finally(() => {
+                      telemetryProps.identification_duration_ms =
+                        Date.now() - identifyFeaturesStart;
+                    }),
                   generateAllComputedFeatures({
                     stream,
                     start,
@@ -150,7 +150,8 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                     newFeaturesCount--;
                     taskContext.logger.debug(
                       () =>
-                        `Overwriting feature with id [${feature.id
+                        `Overwriting feature with id [${
+                          feature.id
                         }] since it already exists.\nExisting feature: ${JSON.stringify(
                           existing
                         )}\nNew feature: ${JSON.stringify(feature)}`
@@ -205,8 +206,8 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   errorMessage.includes('ERR_CANCELED') ||
                   errorMessage.includes('Request was aborted')
                 ) {
-                  taskContext.logger.debug(() =>
-                    `Task ${runContext.taskInstance.id} was canceled: ${errorMessage}`
+                  taskContext.logger.debug(
+                    () => `Task ${runContext.taskInstance.id} was canceled: ${errorMessage}`
                   );
                   return getDeleteTaskRunResult();
                 }

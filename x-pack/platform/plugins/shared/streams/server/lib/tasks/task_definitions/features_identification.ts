@@ -6,12 +6,14 @@
  */
 
 import type { TaskDefinitionRegistry } from '@kbn/task-manager-plugin/server';
-import { isInferenceProviderError } from '@kbn/inference-common';
+import { ChatCompletionTokenCount, isInferenceProviderError } from '@kbn/inference-common';
 import {
   type IdentifyFeaturesResult,
   type BaseFeature,
   isComputedFeature,
   getStreamTypeFromDefinition,
+  Streams,
+  StreamType,
 } from '@kbn/streams-schema';
 import { identifyFeatures, generateAllComputedFeatures } from '@kbn/streams-ai';
 import { getSampleDocuments } from '@kbn/ai-tools/src/tools/describe_dataset/get_sample_documents';
@@ -51,6 +53,11 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 throw new Error('Request is required to run this task');
               }
 
+              const taskStart = Date.now();
+              let identificationDurationMs = 0;
+              let streamType: StreamType = 'unknown';
+              let tokensUsed: ChatCompletionTokenCount = { prompt: 0, completion: 0, total: 0 };
+
               const { connectorId, start, end, streamName, _task } = runContext.taskInstance
                 .params as TaskParams<FeaturesIdentificationTaskParams>;
 
@@ -74,6 +81,8 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   }).getPrompt(),
                 ]);
 
+                streamType = getStreamTypeFromDefinition(stream);
+
                 const boundInferenceClient = inferenceClient.bindTo({ connectorId });
                 const esClient = scopedClusterClient.asCurrentUser;
 
@@ -87,7 +96,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
 
                 const identifyFeaturesStart = Date.now();
                 const [
-                  { features: inferredBaseFeatures, tokensUsed, durationMs },
+                  { features: inferredBaseFeatures, tokensUsed: identifyFeaturesTokensUsed },
                   computedFeatures,
                 ] = await Promise.all([
                   identifyFeatures({
@@ -97,10 +106,9 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                     logger: taskContext.logger.get('features_identification'),
                     signal: runContext.abortController.signal,
                     systemPrompt: featurePromptOverride,
-                  }).then((result) => ({
-                    ...result,
-                    durationMs: Date.now() - identifyFeaturesStart,
-                  })),
+                  }).finally(() => {
+                    identificationDurationMs = Date.now() - identifyFeaturesStart;
+                  }),
                   generateAllComputedFeatures({
                     stream,
                     start,
@@ -109,6 +117,8 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                     logger: taskContext.logger.get('computed_features'),
                   }),
                 ]);
+
+                tokensUsed = identifyFeaturesTokensUsed;
 
                 const identifiedFeatures: BaseFeature[] = [
                   ...inferredBaseFeatures,
@@ -129,8 +139,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                     newFeaturesCount--;
                     taskContext.logger.debug(
                       () =>
-                        `Overwriting feature with id [${
-                          feature.id
+                        `Overwriting feature with id [${feature.id
                         }] since it already exists.\nExisting feature: ${JSON.stringify(
                           existing
                         )}\nNew feature: ${JSON.stringify(feature)}`
@@ -159,14 +168,16 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 );
 
                 taskContext.telemetry.trackFeaturesIdentified({
-                  duration_ms: durationMs,
-                  stream_name: stream.name,
-                  stream_type: getStreamTypeFromDefinition(stream),
+                  total_duration_ms: Date.now() - taskStart,
+                  identification_duration_ms: identificationDurationMs,
+                  stream_name: streamName,
+                  stream_type: streamType,
                   input_tokens_used: tokensUsed.prompt,
                   output_tokens_used: tokensUsed.completion,
                   total_tokens_used: tokensUsed.total,
                   inferred_total_count: inferredBaseFeatures.length,
                   inferred_dedup_count: newFeaturesCount,
+                  success: true,
                 });
               } catch (error) {
                 if (isDefinitionNotFoundError(error)) {
@@ -188,6 +199,9 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   errorMessage.includes('ERR_CANCELED') ||
                   errorMessage.includes('Request was aborted')
                 ) {
+                  taskContext.logger.debug(() =>
+                    `Task ${runContext.taskInstance.id} was canceled: ${errorMessage}`
+                  );
                   return getDeleteTaskRunResult();
                 }
 
@@ -201,6 +215,19 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   { connectorId, start, end, streamName },
                   errorMessage
                 );
+
+                taskContext.telemetry.trackFeaturesIdentified({
+                  total_duration_ms: Date.now() - taskStart,
+                  identification_duration_ms: identificationDurationMs,
+                  stream_name: streamName,
+                  stream_type: streamType,
+                  input_tokens_used: tokensUsed.prompt,
+                  output_tokens_used: tokensUsed.completion,
+                  total_tokens_used: tokensUsed.total,
+                  inferred_total_count: 0,
+                  inferred_dedup_count: 0,
+                  success: false,
+                });
 
                 return getDeleteTaskRunResult();
               }

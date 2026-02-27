@@ -133,6 +133,8 @@ Evidence requirements:
 - Prefer stable `field.path=value` snippets when possible; otherwise short direct quotes
 - When the supporting evidence is clearly from a specific sample document and a document `_id` is available in `sample_documents`, include it to aid traceability. Use a compact prefix format like `_id=<DOCUMENT_ID> field.path=value` or `_id=<DOCUMENT_ID> "<short quote>"`.
 - If the evidence is aggregate/system-wide (not attributable to one document) or the `_id` is not available, omit the `_id`.
+- Deduplicate evidence items by meaning: if the same evidence snippet (e.g. `service.name=<service>`) appears in multiple documents, DO NOT repeat it as separate evidence lines with different `_id`s. Instead, keep only one representative evidence line (choose any single `_id`).
+- Aim for evidence diversity: use evidence lines that support different aspects of the claim (name, version, protocol, relationship, etc.) rather than repeating the same key/value.
 - Evidence must directly support the feature claim
 
 Version formatting rules (important for vulnerability analysis):

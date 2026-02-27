@@ -6,14 +6,12 @@
  */
 
 import type { TaskDefinitionRegistry } from '@kbn/task-manager-plugin/server';
-import { ChatCompletionTokenCount, isInferenceProviderError } from '@kbn/inference-common';
+import { isInferenceProviderError } from '@kbn/inference-common';
 import {
   type IdentifyFeaturesResult,
   type BaseFeature,
   isComputedFeature,
   getStreamTypeFromDefinition,
-  Streams,
-  StreamType,
 } from '@kbn/streams-schema';
 import { identifyFeatures, generateAllComputedFeatures } from '@kbn/streams-ai';
 import { getSampleDocuments } from '@kbn/ai-tools/src/tools/describe_dataset/get_sample_documents';
@@ -28,6 +26,7 @@ import { PromptsConfigService } from '../../saved_objects/significant_events/pro
 import { cancellableTask } from '../cancellable_task';
 import { MAX_FEATURE_AGE_MS } from '../../streams/feature/feature_client';
 import { isDefinitionNotFoundError } from '../../streams/errors/definition_not_found_error';
+import { StreamsFeaturesIdentifiedProps } from '../../telemetry';
 
 export interface FeaturesIdentificationTaskParams {
   connectorId: string;
@@ -54,12 +53,21 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
               }
 
               const taskStart = Date.now();
-              let identificationDurationMs = 0;
-              let streamType: StreamType = 'unknown';
-              let tokensUsed: ChatCompletionTokenCount = { prompt: 0, completion: 0, total: 0 };
-
               const { connectorId, start, end, streamName, _task } = runContext.taskInstance
                 .params as TaskParams<FeaturesIdentificationTaskParams>;
+
+              const telemetryProps: StreamsFeaturesIdentifiedProps = {
+                total_duration_ms: 0,
+                identification_duration_ms: 0,
+                stream_name: streamName,
+                stream_type: 'unknown',
+                input_tokens_used: 0,
+                output_tokens_used: 0,
+                total_tokens_used: 0,
+                inferred_total_count: 0,
+                inferred_dedup_count: 0,
+                success: false,
+              };
 
               const {
                 taskClient,
@@ -81,7 +89,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   }).getPrompt(),
                 ]);
 
-                streamType = getStreamTypeFromDefinition(stream);
+                telemetryProps.stream_type = getStreamTypeFromDefinition(stream);
 
                 const boundInferenceClient = inferenceClient.bindTo({ connectorId });
                 const esClient = scopedClusterClient.asCurrentUser;
@@ -96,7 +104,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
 
                 const identifyFeaturesStart = Date.now();
                 const [
-                  { features: inferredBaseFeatures, tokensUsed: identifyFeaturesTokensUsed },
+                  { features: inferredBaseFeatures },
                   computedFeatures,
                 ] = await Promise.all([
                   identifyFeatures({
@@ -106,8 +114,13 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                     logger: taskContext.logger.get('features_identification'),
                     signal: runContext.abortController.signal,
                     systemPrompt: featurePromptOverride,
+                  }).then((result) => {
+                    telemetryProps.input_tokens_used = result.tokensUsed.prompt;
+                    telemetryProps.output_tokens_used = result.tokensUsed.completion;
+                    telemetryProps.total_tokens_used = result.tokensUsed.total;
+                    return result;
                   }).finally(() => {
-                    identificationDurationMs = Date.now() - identifyFeaturesStart;
+                    telemetryProps.identification_duration_ms = Date.now() - identifyFeaturesStart;
                   }),
                   generateAllComputedFeatures({
                     stream,
@@ -117,8 +130,6 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                     logger: taskContext.logger.get('computed_features'),
                   }),
                 ]);
-
-                tokensUsed = identifyFeaturesTokensUsed;
 
                 const identifiedFeatures: BaseFeature[] = [
                   ...inferredBaseFeatures,
@@ -168,15 +179,10 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 );
 
                 taskContext.telemetry.trackFeaturesIdentified({
-                  total_duration_ms: Date.now() - taskStart,
-                  identification_duration_ms: identificationDurationMs,
-                  stream_name: streamName,
-                  stream_type: streamType,
-                  input_tokens_used: tokensUsed.prompt,
-                  output_tokens_used: tokensUsed.completion,
-                  total_tokens_used: tokensUsed.total,
+                  ...telemetryProps,
                   inferred_total_count: inferredBaseFeatures.length,
                   inferred_dedup_count: newFeaturesCount,
+                  total_duration_ms: Date.now() - taskStart,
                   success: true,
                 });
               } catch (error) {
@@ -217,15 +223,8 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 );
 
                 taskContext.telemetry.trackFeaturesIdentified({
+                  ...telemetryProps,
                   total_duration_ms: Date.now() - taskStart,
-                  identification_duration_ms: identificationDurationMs,
-                  stream_name: streamName,
-                  stream_type: streamType,
-                  input_tokens_used: tokensUsed.prompt,
-                  output_tokens_used: tokensUsed.completion,
-                  total_tokens_used: tokensUsed.total,
-                  inferred_total_count: 0,
-                  inferred_dedup_count: 0,
                   success: false,
                 });
 

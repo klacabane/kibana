@@ -306,10 +306,16 @@ const streamsFeaturesIdentifiedSchema: RootSchema<StreamsFeaturesIdentifiedProps
       description: 'The total number of tokens used for the identification request',
     },
   },
-  duration_ms: {
+  total_duration_ms: {
     type: 'long',
     _meta: {
-      description: 'The duration of the features identification',
+      description: 'The total duration of the features identification task in milliseconds',
+    },
+  },
+  identification_duration_ms: {
+    type: 'long',
+    _meta: {
+      description: 'The duration of the LLM features identification in milliseconds',
     },
   },
   stream_type: {

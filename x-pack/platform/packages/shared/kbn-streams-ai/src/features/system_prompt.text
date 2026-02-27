@@ -58,6 +58,13 @@ Schema features describe the **log schema family** evident from field names and 
 
 - **Identify high-level components**: Focus on services, databases, queues, caches, and other architectural building blocks — not individual instances, pods, or hosts.
 - **Attach context to entities**: When technology or infrastructure details can be attributed to a specific entity, include them in the entity's `properties` or `meta`. This duplication with standalone infrastructure/technology features is expected and desirable — entities carry their own context while standalone features provide system-wide visibility.
+- **Add optional anchor**: `meta.anchor` can be included when strong evidence exists. It is primarily useful for entities, but can be added to other feature types when it makes sense.
+- **Anchor shape**: `meta.anchor` should use these condition forms:
+  - Single equality: `{ "field": "...", "eq": "..." }` (value can be string, number, or boolean)
+  - AND group: `{ "and": [ { "field": "...", "eq": "..." }, ... ] }`
+  - OR group: `{ "or": [ { "field": "...", "eq": "..." }, ... ] }`
+  - Use only `eq`, `and`, and `or` operators for the anchor condition.
+- **Anchor quality constraints**: Prefer stable, selective fields (for example, service/component names). Avoid broad anchors that match most documents (for example, `agent.name=filebeat`) and avoid high-cardinality or instance-like values (pod names, hostnames, container IDs, request/trace IDs, IPs).
 - **Require sufficient evidence**: Do not speculatively create entities. Only emit an entity when the log evidence clearly identifies a distinct, named system component.
 - **Keep rules generic**: Entity identification is not tied to specific technologies or log patterns. Any log evidence that reveals a distinct, named system component qualifies.
 
@@ -190,6 +197,34 @@ Version formatting rules (important for vulnerability analysis):
   "meta": {
     "version": "14.2",
     "observed_tables": ["users", "user_sessions", "user_preferences"]
+  }
+}
+```
+
+**Example 2b — Entity anchor (compact example)**
+```
+{
+  "type": "entity",
+  "subtype": "service",
+  "id": "checkout-api",
+  "title": "Checkout API",
+  "description": "Checkout API service handling payment and order requests",
+  "properties": {
+    "name": "checkout-api"
+  },
+  "confidence": 90,
+  "evidence": [
+    "service.name=checkout-api",
+    "event.dataset=checkout-api.logs"
+  ],
+  "tags": ["entity", "service"],
+  "meta": {
+    "anchor": {
+      "and": [
+        { "field": "service.name", "eq": "checkout-api" },
+        { "field": "event.dataset", "eq": "checkout-api.logs" }
+      ]
+    }
   }
 }
 ```

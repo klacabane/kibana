@@ -64,8 +64,52 @@ const featuresSchema = {
           },
           meta: {
             type: 'object',
-            properties: {},
-            description: 'Useful metadata that is not captured in other properties.',
+            properties: {
+              anchor: {
+                type: 'object',
+                properties: {
+                  field: {
+                    type: 'string',
+                    description: 'Field name for single equality anchor.',
+                  },
+                  eq: {
+                    type: 'string',
+                    description:
+                      'Equality value for single anchor. For numbers/booleans, string representation is allowed.',
+                  },
+                  and: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        field: { type: 'string' },
+                        eq: {
+                          type: 'string',
+                        },
+                      },
+                      required: ['field', 'eq'],
+                    },
+                  },
+                  or: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        field: { type: 'string' },
+                        eq: {
+                          type: 'string',
+                        },
+                      },
+                      required: ['field', 'eq'],
+                    },
+                  },
+                },
+                description:
+                  'Optional condition used to scope filtering to the corresponding feature. Allowed forms: single equality `{field, eq}` or one-level `{and: [...]}` / `{or: [...]}` of equality conditions.',
+              },
+            },
+            description:
+              'Useful metadata that is not captured in other properties. Can include optional `anchor`.',
           },
         },
         required: [

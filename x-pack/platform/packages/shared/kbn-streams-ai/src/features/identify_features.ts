@@ -10,6 +10,7 @@ import type { Logger } from '@kbn/core/server';
 import type { BoundInferenceClient, ChatCompletionTokenCount } from '@kbn/inference-common';
 import { type BaseFeature, baseFeatureSchema } from '@kbn/streams-schema';
 import { withSpan } from '@kbn/apm-utils';
+import { conditionSchema, type Condition } from '@kbn/streamlang';
 import { createIdentifyFeaturesPrompt } from './prompt';
 import { sumTokens } from '../helpers/sum_tokens';
 
@@ -51,10 +52,14 @@ export async function identifyFeatures({
   const features = uniqBy(
     response.toolCalls
       .flatMap((toolCall) => toolCall.function.arguments.features)
-      .map((feature) => ({
-        ...feature,
-        stream_name: streamName,
-      }))
+      .map((feature) => {
+        return {
+          ...feature,
+          stream_name: streamName,
+          meta: feature.meta &&
+            { ...feature.meta, anchor: tryParseAnchor(feature.meta.anchor) }
+        };
+      })
       .filter((feature) => {
         const result = baseFeatureSchema.safeParse(feature);
         if (!result.success) {
@@ -72,3 +77,12 @@ export async function identifyFeatures({
     tokensUsed: sumTokens({ prompt: 0, completion: 0, total: 0, cached: 0 }, response.tokens),
   };
 }
+
+function tryParseAnchor(maybeAnchor: unknown): Condition | undefined {
+  if (!maybeAnchor) {
+    return undefined;
+  }
+
+  const result = conditionSchema.safeParse(maybeAnchor);
+  return result.success ? result.data : undefined;
+};

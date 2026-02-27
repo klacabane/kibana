@@ -21,7 +21,7 @@ export function formatRawDocument({
   const fields = {
     ...(hit.fields ?? {}),
     ...getFlattenedObject(hit._source ?? {}),
-  }
+  };
   if (isEmpty(fields)) return undefined;
 
   return {

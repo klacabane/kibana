@@ -38,17 +38,21 @@ export async function identifyFeatures({
   logger.debug(`Identifying features from ${sampleDocuments.length} sample documents`);
 
   const formattedDocuments = compact(
-    sampleDocuments.map(hit => formatRawDocument({
-      hit,
-      shouldNotTruncate(key: string) { return key.includes("tags") },
-    }))
+    sampleDocuments.map((hit) =>
+      formatRawDocument({
+        hit,
+        shouldNotTruncate(key: string) {
+          return key.includes('tags');
+        },
+      })
+    )
   );
 
   const response = await withSpan('invoke_prompt', () =>
     inferenceClient.prompt({
       input: { sample_documents: JSON.stringify(formattedDocuments) },
       prompt: createIdentifyFeaturesPrompt({ systemPrompt }),
-      finalToolChoice: { function: 'finalize_features', },
+      finalToolChoice: { function: 'finalize_features' },
       abortSignal: signal,
     })
   );
@@ -56,7 +60,7 @@ export async function identifyFeatures({
   const features = uniqBy(
     response.toolCalls
       .flatMap((toolCall) => toolCall.function.arguments.features)
-      .map((feature) => ({ ...feature, stream_name: streamName, }))
+      .map((feature) => ({ ...feature, stream_name: streamName }))
       .filter((feature) => {
         const result = baseFeatureSchema.safeParse(feature);
         if (!result.success) {

@@ -333,7 +333,7 @@ const streamsFeaturesIdentifiedSchema: RootSchema<StreamsFeaturesIdentifiedProps
   state: {
     type: 'keyword',
     _meta: {
-      description: 'The state of the features identification task (success, failure, or cancelled)',
+      description: 'The state of the features identification task (success, failure, or canceled)',
     },
   },
 };

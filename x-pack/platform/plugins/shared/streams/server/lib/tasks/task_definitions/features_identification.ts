@@ -212,7 +212,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   taskContext.telemetry.trackFeaturesIdentified({
                     ...telemetryProps,
                     total_duration_ms: Date.now() - taskStart,
-                    state: 'cancelled',
+                    state: 'canceled',
                   });
                   return getDeleteTaskRunResult();
                 }

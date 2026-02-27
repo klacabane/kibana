@@ -71,7 +71,7 @@ interface StreamsFeaturesIdentifiedProps {
   total_tokens_used: number;
   stream_name: string;
   stream_type: StreamType;
-  state: 'success' | 'failure' | 'cancelled';
+  state: 'success' | 'failure' | 'canceled';
 }
 
 export {

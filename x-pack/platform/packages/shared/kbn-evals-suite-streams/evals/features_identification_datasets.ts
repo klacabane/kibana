@@ -54,7 +54,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
               'checkout-api v4.8.0 initializing... runtime: Go go1.22.1 arch=linux/amd64 build=9f2c1a7',
             'service.name': 'checkout-api',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '2',
@@ -64,7 +64,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
             message: 'system info: Ubuntu 22.04.3 LTS (Jammy Jellyfish) kernel 5.15.0-89',
             'service.name': 'checkout-api',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '3',
@@ -75,7 +75,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
               'db connection OK: PostgreSQL 16.1 on x86_64-pc-linux-gnu @ checkout-db.internal:5432/checkout (ssl enabled)',
             'service.name': 'checkout-api',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '4',
@@ -86,7 +86,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
               'cache connection successful redis-cache.internal:6379 server_version=7.2.5 mode=standalone',
             'service.name': 'checkout-api',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '5',
@@ -97,7 +97,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
               'retrieved cloud metadata successfully provider=aws region=us-east-1 account_id=123456789012',
             'service.name': 'checkout-api',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '6',
@@ -109,7 +109,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
             'k8s.pod.name': 'checkout-api-79c64f4c9d-2j9bz',
             'service.name': 'checkout-api',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '7',
@@ -122,7 +122,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
             'http.method': 'POST',
             'peer.service': 'fraud-service',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '8',
@@ -133,7 +133,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
               'external api call POST https://api.stripe.com/v1/payment_intents completed status=200 target=stripe',
             'service.name': 'checkout-api',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '9',
@@ -143,7 +143,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
             message: 'migration tool: goose v3.18.0 applied 3 pending migrations',
             'service.name': 'checkout-api',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '10',
@@ -153,7 +153,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
             message: 'health endpoint /ready responding with 200',
             'service.name': 'checkout-api',
             'log.level': 'INFO',
-          }
+          },
         },
       ],
     },
@@ -230,7 +230,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
               'OrderService bootstrap: Java 21.0.2, Spring Boot 3.2.1, host order-svc-7d8f9c running CentOS Stream 9',
             'service.name': 'order-service',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '2',
@@ -241,7 +241,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
               'HikariPool-1 starting up... driver: MySQL Connector/J 8.2.0 autoCommit=false poolSize=10',
             'service.name': 'order-service',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '3',
@@ -252,7 +252,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
               'MySQL 8.0.35 connection established mysql-primary.internal:3306 schema=orders charset=utf8mb4',
             'service.name': 'order-service',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '4',
@@ -263,7 +263,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
               'initialized Kafka producer config: brokers=kafka-broker.internal:9092 client.version=Apache Kafka 3.6.1',
             'service.name': 'order-service',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '5',
@@ -274,7 +274,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
               'loaded GCP environment: project_id=acme-prod compute_zone=us-central1-f vm_instance=order-svc-7d8f9c',
             'service.name': 'order-service',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '6',
@@ -285,7 +285,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
               'service registration complete: Eureka registry order-service @ 10.128.0.15:8080 status=UP',
             'service.name': 'order-service',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '7',
@@ -296,17 +296,18 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
               'Feign HTTP client ready: target inventory-service url=http://inventory.internal:8080',
             'service.name': 'order-service',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '8',
           _index: 'order-service',
           fields: {
             '@timestamp': '2026-02-05T14:30:00.900Z',
-            message: 'upstream GET /api/stock?sku=ABC123 inventory-service returned 200 elapsed=45ms',
+            message:
+              'upstream GET /api/stock?sku=ABC123 inventory-service returned 200 elapsed=45ms',
             'service.name': 'order-service',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '9',
@@ -316,7 +317,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
             message: 'embedded Tomcat listening 0.0.0.0:8080 protocol=http contextPath=""',
             'service.name': 'order-service',
             'log.level': 'INFO',
-          }
+          },
         },
         {
           _id: '10',
@@ -327,7 +328,7 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
               '{"event":"app_ready","app_start_ms":2140,"jvm_uptime_ms":3010,"gc_pauses":2,"heap_used_mb":512}',
             'service.name': 'order-service',
             'log.level': 'INFO',
-          }
+          },
         },
       ],
     },
@@ -438,7 +439,8 @@ const OBVIOUS_EVIDENCE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
           _index: 'telemetry-collector',
           fields: {
             '@timestamp': '2026-03-18T08:45:00.490Z',
-            message: 'cloud environment detected: Azure sub=abc123 region=westus2 vm=vm-telemetry-01',
+            message:
+              'cloud environment detected: Azure sub=abc123 region=westus2 vm=vm-telemetry-01',
             'service.name': 'telemetry-collector',
             'log.level': 'INFO',
           },
@@ -1003,7 +1005,8 @@ const INFERENCE_REQUIRED_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
           _index: 'etl-worker',
           fields: {
             '@timestamp': '2026-01-13T07:20:02.220Z',
-            message: 'psycopg2.OperationalError: could not translate host name "orders-db.internal"',
+            message:
+              'psycopg2.OperationalError: could not translate host name "orders-db.internal"',
             'service.name': 'etl-worker',
             'log.level': 'ERROR',
           },
@@ -1563,7 +1566,8 @@ const INFERENCE_REQUIRED_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
           _index: 'analytics-engine',
           fields: {
             '@timestamp': '2026-04-12T15:20:00.870Z',
-            message: 'Apache Spark session created (spark.master=spark://spark-master.internal:7077)',
+            message:
+              'Apache Spark session created (spark.master=spark://spark-master.internal:7077)',
             'service.name': 'analytics-engine',
             'log.level': 'INFO',
           },
@@ -3063,7 +3067,8 @@ const FALSE_POSITIVE_EXAMPLES: FeatureIdentificationEvaluationExample[] = [
           _index: 'report-generator',
           fields: {
             '@timestamp': '2026-04-15T13:55:01.140Z',
-            message: 'Evaluating alternative: MongoDB Atlas vs current CockroachDB (evaluation only)',
+            message:
+              'Evaluating alternative: MongoDB Atlas vs current CockroachDB (evaluation only)',
             'service.name': 'report-generator',
             'log.level': 'DEBUG',
           },

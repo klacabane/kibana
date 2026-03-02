@@ -10,6 +10,7 @@ import { identifyFeatures } from '@kbn/streams-ai';
 import { featuresPrompt } from '@kbn/streams-ai/src/features/prompt';
 import { get } from 'lodash';
 import { tags } from '@kbn/scout';
+import type { SearchHit } from '@elastic/elasticsearch/lib/api/types';
 import { evaluate } from '../src/evaluate';
 import type { StreamsEvaluationWorkerFixtures } from '../src/types';
 import type {
@@ -61,8 +62,8 @@ const typeValidationEvaluator = {
       explanation:
         invalidFeatures.length > 0
           ? `Invalid types: ${invalidFeatures
-              .map((f) => `"${f.id}" has type "${f.type}"`)
-              .join('; ')} (expected one of: ${VALID_FEATURE_TYPES.join(', ')})`
+            .map((f) => `"${f.id}" has type "${f.type}"`)
+            .join('; ')} (expected one of: ${VALID_FEATURE_TYPES.join(', ')})`
           : 'All features have a valid type',
       details: {
         total: features.length,
@@ -90,9 +91,13 @@ function parseKeyValuePairs(evidence: string): Array<{ key: string; value: strin
   return pairs;
 }
 
-function getNestedValue(doc: Record<string, unknown>, path: string): unknown {
-  if (path in doc) {
-    return doc[path];
+function getNestedValue(doc: SearchHit<Record<string, unknown>>, path: string): unknown {
+  if (!doc.fields) {
+    return undefined;
+  }
+
+  if (path in doc.fields) {
+    return doc.fields[path];
   }
 
   return get(doc, path);
@@ -102,7 +107,7 @@ function getNestedValue(doc: Record<string, unknown>, path: string): unknown {
  * Recursively extracts all string values from a document object,
  * so direct-quote evidence can be matched against any field.
  */
-function getAllStringValues(doc: Record<string, unknown>): string[] {
+function getAllStringValues(doc: SearchHit<Record<string, unknown>>): string[] {
   const values: string[] = [];
 
   const walk = (obj: unknown) => {
@@ -119,7 +124,7 @@ function getAllStringValues(doc: Record<string, unknown>): string[] {
     }
   };
 
-  walk(doc);
+  walk(doc.fields);
   return values;
 }
 
@@ -131,7 +136,7 @@ function getAllStringValues(doc: Record<string, unknown>): string[] {
  * 2. Direct quote evidence: checks if the text appears as a substring in any
  *    string value across all document fields.
  */
-function isEvidenceGrounded(evidence: string, documents: Array<Record<string, unknown>>): boolean {
+function isEvidenceGrounded(evidence: string, documents: Array<SearchHit<Record<string, unknown>>>): boolean {
   // Direct quote: check against all string values in all documents
   const matchesStringValue = documents.some((doc) => {
     const allValues = getAllStringValues(doc);
@@ -201,11 +206,10 @@ const evidenceGroundingEvaluator = {
       score,
       explanation:
         ungroundedItems.length > 0
-          ? `${
-              ungroundedItems.length
-            }/${totalEvidence} evidence strings not grounded: ${ungroundedItems
-              .slice(0, 3)
-              .join('; ')}`
+          ? `${ungroundedItems.length
+          }/${totalEvidence} evidence strings not grounded: ${ungroundedItems
+            .slice(0, 3)
+            .join('; ')}`
           : `All ${totalEvidence} evidence strings are grounded in input documents`,
       details: { totalEvidence, groundedEvidence, ungroundedItems },
     };
@@ -236,9 +240,8 @@ const featureCountEvaluator = {
       explanation:
         issues.length > 0
           ? issues.join('; ')
-          : `Feature count ${count} is within bounds [${min_features ?? '∞'}, ${
-              max_features ?? '∞'
-            }]`,
+          : `Feature count ${count} is within bounds [${min_features ?? '∞'}, ${max_features ?? '∞'
+          }]`,
       details: { count, min_features, max_features },
     };
   },
@@ -267,11 +270,10 @@ const confidenceBoundsEvaluator = {
       score: violations.length === 0 ? 1 : 1 - violations.length / features.length,
       explanation:
         violations.length > 0
-          ? `${violations.length}/${
-              features.length
-            } features exceed max confidence ${max_confidence}: ${violations
-              .map((f) => `"${f.id}" (${f.confidence})`)
-              .join(', ')}`
+          ? `${violations.length}/${features.length
+          } features exceed max confidence ${max_confidence}: ${violations
+            .map((f) => `"${f.id}" (${f.confidence})`)
+            .join(', ')}`
           : `All features have confidence ≤ ${max_confidence}`,
       details: {
         max_confidence,

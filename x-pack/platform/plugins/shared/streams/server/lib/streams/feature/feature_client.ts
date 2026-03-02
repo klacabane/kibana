@@ -27,6 +27,7 @@ import {
   FEATURE_TAGS,
   FEATURE_META,
   FEATURE_EXPIRES_AT,
+  FEATURE_FILTER,
 } from './fields';
 import type { FeatureStorageSettings } from './storage_settings';
 import type { StoredFeature } from './stored_feature';
@@ -48,7 +49,7 @@ export class FeatureClient {
     private readonly clients: {
       storageClient: IStorageClient<FeatureStorageSettings, StoredFeature>;
     }
-  ) {}
+  ) { }
 
   async clean() {
     await this.clients.storageClient.clean();
@@ -201,18 +202,18 @@ export class FeatureClient {
     const validDeleteIds =
       deleteIds.length > 0
         ? new Set(
-            (
-              await this.clients.storageClient.search({
-                size: deleteIds.length,
-                track_total_hits: false,
-                query: {
-                  bool: {
-                    filter: [{ terms: { _id: deleteIds } }, ...termQuery(STREAM_NAME, stream)],
-                  },
+          (
+            await this.clients.storageClient.search({
+              size: deleteIds.length,
+              track_total_hits: false,
+              query: {
+                bool: {
+                  filter: [{ terms: { _id: deleteIds } }, ...termQuery(STREAM_NAME, stream)],
                 },
-              })
-            ).hits.hits.flatMap((hit) => hit._id ?? [])
-          )
+              },
+            })
+          ).hits.hits.flatMap((hit) => hit._id ?? [])
+        )
         : new Set<string>();
 
     return operations.filter(
@@ -248,6 +249,7 @@ function toStorage(stream: string, feature: Feature): StoredFeature {
     [FEATURE_META]: feature.meta,
     [FEATURE_EXPIRES_AT]: feature.expires_at,
     [FEATURE_TITLE]: feature.title,
+    [FEATURE_FILTER]: feature.filter,
   };
 }
 
@@ -268,5 +270,6 @@ function fromStorage(feature: StoredFeature): Feature {
     meta: feature[FEATURE_META],
     expires_at: feature[FEATURE_EXPIRES_AT],
     title: feature[FEATURE_TITLE],
+    filter: feature[FEATURE_FILTER],
   };
 }

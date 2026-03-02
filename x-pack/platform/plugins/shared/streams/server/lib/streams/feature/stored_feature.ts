@@ -7,6 +7,7 @@
 
 import { z } from '@kbn/zod';
 import { featureStatusSchema } from '@kbn/streams-schema/src/feature';
+import { conditionSchema } from '@kbn/streamlang/types/conditions';
 import {
   STREAM_NAME,
   FEATURE_UUID,
@@ -23,6 +24,7 @@ import {
   FEATURE_ID,
   FEATURE_PROPERTIES,
   FEATURE_SUBTYPE,
+  FEATURE_FILTER,
 } from './fields';
 
 export const storedFeatureSchema = z.object({
@@ -41,6 +43,7 @@ export const storedFeatureSchema = z.object({
   [FEATURE_META]: z.record(z.string(), z.any()).optional(),
   [FEATURE_EXPIRES_AT]: z.string().optional(),
   [FEATURE_TITLE]: z.string().optional(),
+  [FEATURE_FILTER]: conditionSchema.optional(),
 });
 
 export type StoredFeature = z.infer<typeof storedFeatureSchema>;

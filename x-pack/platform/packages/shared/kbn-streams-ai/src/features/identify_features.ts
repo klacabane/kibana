@@ -42,9 +42,6 @@ export async function identifyFeatures({
         sample_documents: JSON.stringify(sampleDocuments),
       },
       prompt: createIdentifyFeaturesPrompt({ systemPrompt }),
-      finalToolChoice: {
-        function: 'finalize_features',
-      },
       abortSignal: signal,
     })
   );
@@ -56,8 +53,7 @@ export async function identifyFeatures({
         return {
           ...feature,
           stream_name: streamName,
-          meta: feature.meta &&
-            { ...feature.meta, anchor: tryParseAnchor(feature.meta.anchor) }
+          filter: tryParseFilter(feature.filter),
         };
       })
       .filter((feature) => {
@@ -78,11 +74,12 @@ export async function identifyFeatures({
   };
 }
 
-function tryParseAnchor(maybeAnchor: unknown): Condition | undefined {
-  if (!maybeAnchor) {
+function tryParseFilter(maybeFilter: unknown): Condition | undefined {
+  if (!maybeFilter) {
     return undefined;
   }
 
-  const result = conditionSchema.safeParse(maybeAnchor);
+  console.log("GOT FILTER", JSON.stringify(maybeFilter, null, 2));
+  const result = conditionSchema.safeParse(maybeFilter);
   return result.success ? result.data : undefined;
 };

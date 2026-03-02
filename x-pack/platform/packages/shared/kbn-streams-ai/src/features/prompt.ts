@@ -62,54 +62,48 @@ const featuresSchema = {
             },
             description: 'The tags that describe the feature.',
           },
-          meta: {
+          filter: {
             type: 'object',
             properties: {
-              anchor: {
-                type: 'object',
-                properties: {
-                  field: {
-                    type: 'string',
-                    description: 'Field name for single equality anchor.',
-                  },
-                  eq: {
-                    type: 'string',
-                    description:
-                      'Equality value for single anchor. For numbers/booleans, string representation is allowed.',
-                  },
-                  and: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        field: { type: 'string' },
-                        eq: {
-                          type: 'string',
-                        },
-                      },
-                      required: ['field', 'eq'],
-                    },
-                  },
-                  or: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        field: { type: 'string' },
-                        eq: {
-                          type: 'string',
-                        },
-                      },
-                      required: ['field', 'eq'],
-                    },
+              field: {
+                type: 'string',
+                description: 'Field name for single equality filter.',
+              },
+              eq: {
+                type: 'string',
+                description:
+                  'Equality value for single filter. For numbers/booleans, string representation is allowed.',
+              },
+              and: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    field: { type: 'string' },
+                    eq: { type: 'string', },
                   },
                 },
-                description:
-                  'Optional condition used to scope filtering to the corresponding feature. Allowed forms: single equality `{field, eq}` or one-level `{and: [...]}` / `{or: [...]}` of equality conditions.',
+              },
+              or: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    field: { type: 'string' },
+                    eq: { type: 'string', },
+                  },
+                },
               },
             },
             description:
-              'Useful metadata that is not captured in other properties. Can include optional `anchor`.',
+              'Optional condition used to scope filtering to the corresponding feature. Allowed forms: single equality `{field, eq}` or one-level `{and: [...]}` / `{or: [...]}` of equality conditions.',
+
+          },
+          meta: {
+            type: 'object',
+            properties: {},
+            description:
+              'Useful metadata that is not captured in other properties.',
           },
         },
         required: [
@@ -122,7 +116,6 @@ const featuresSchema = {
           'confidence',
           'evidence',
           'tags',
-          'meta',
         ],
       },
     },

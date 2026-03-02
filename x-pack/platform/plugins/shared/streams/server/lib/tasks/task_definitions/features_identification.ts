@@ -79,7 +79,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 const boundInferenceClient = inferenceClient.bindTo({ connectorId });
                 const esClient = scopedClusterClient.asCurrentUser;
                 const { hits: existingFeatures } = await featureClient.getFeatures(stream.name);
-                const sampleDocumentsFilter = createEntityAnchorExclusionFilter(existingFeatures);
+                const sampleDocumentsFilter = createEntityExclusionFilter(existingFeatures);
 
                 const { hits: sampleDocuments } = await getSampleDocuments({
                   esClient,
@@ -192,18 +192,18 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
   } satisfies TaskDefinitionRegistry;
 }
 
-function createEntityAnchorExclusionFilter(
+function createEntityExclusionFilter(
   features: Feature[]
 ): QueryDslQueryContainer | undefined {
-  const anchors = features.flatMap((feature) => (feature.meta?.anchor ? [feature.meta.anchor] : []));
+  const filters = features.flatMap((feature) => (feature.filter ? [feature.filter] : []));
 
-  if (anchors.length === 0) {
+  if (filters.length === 0) {
     return undefined;
   }
 
   return {
     bool: {
-      must_not: anchors.map((anchor) => conditionToQueryDsl(anchor)),
+      must_not: filters.map((filter) => conditionToQueryDsl(filter)),
     },
   };
 }

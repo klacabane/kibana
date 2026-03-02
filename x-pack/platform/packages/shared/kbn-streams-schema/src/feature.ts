@@ -36,10 +36,8 @@ export const baseFeatureSchema = z.object({
   confidence: z.number().min(0).max(100),
   evidence: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
-  meta: z
-    .object({ anchor: conditionSchema.optional(), })
-    .catchall(z.unknown())
-    .optional(),
+  filter: conditionSchema.optional(),
+  meta: z.record(z.string(), z.unknown()).optional()
 });
 
 export type BaseFeature = z.infer<typeof baseFeatureSchema>;

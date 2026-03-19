@@ -83,6 +83,7 @@ dependsOn:
   - '@kbn/agent-builder-common'
   - '@kbn/agent-builder-server'
   - '@kbn/agent-builder-plugin'
+  - '@kbn/data-views-plugin'
 tags:
   - plugin
   - prod

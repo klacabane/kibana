@@ -188,6 +188,7 @@ export {
 
 export {
   type Feature,
+  type FeatureWithFilter,
   type BaseFeature,
   type FeatureStatus,
   DATASET_ANALYSIS_FEATURE_TYPE,

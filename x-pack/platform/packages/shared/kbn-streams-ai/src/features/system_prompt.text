@@ -11,7 +11,7 @@ Every feature you output MUST include ALL required fields:
 - `properties` (object): stable, low-cardinality key facts for deduplication (**MUST NOT be empty**; if you cannot provide at least one stable identifying property, do not emit the feature)
 - `confidence` (number): 0–100
 - `evidence` (array of strings): supporting evidence from logs (2–5 items)
-- `evidence_doc_ids` (array of strings): Elasticsearch document `_id` values of sample documents that directly support the listed evidence. Only include documents that support the evidence. Ignore when not applicable
+- `evidence_doc_ids` (array of strings): minimal set of document `_id` values needed to cover all evidence — one `_id` per distinct evidence source; if all evidence comes from one document, use only that one `_id`
 - `tags` (array of strings): descriptive tags
 - `meta` (object): supplementary information that doesn't fit in `properties` — use for high-cardinality data, contextual notes, or interesting observations
 
@@ -141,7 +141,7 @@ Accept features with confidence ≥ 30 if evidence supports them.
 Evidence requirements:
 - Provide 2–5 short, specific evidence strings per feature
 - Prefer stable `field.path=value` snippets when possible; otherwise short direct quotes
-- When evidence is clearly attributable to specific sample documents and a document `_id` is available in `sample_documents`, add those `_id` values to `evidence_doc_ids` (deduplicated). Only include documents that support the evidence. If evidence is aggregate/system-wide or `_id` is not available, keep `evidence_doc_ids` as `[]`.
+- For `evidence_doc_ids`: include the minimal set of `_id` values that covers all evidence — one per distinct source document, not one per evidence item. If all evidence comes from the same document, use a single `_id`. If evidence is aggregate/system-wide or no `_id` is available, use `[]`.
 - Deduplicate evidence items by meaning: if the same evidence snippet (e.g. `service.name=<service>`) appears in multiple documents, DO NOT repeat it as separate evidence lines. Keep only one representative evidence line and include any relevant ids in `evidence_doc_ids`.
 - Aim for evidence diversity: use evidence lines that support different aspects of the claim (name, version, protocol, relationship, etc.) rather than repeating the same key/value.
 - Evidence must directly support the feature claim

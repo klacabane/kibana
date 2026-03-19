@@ -10,14 +10,18 @@ import { isInferenceProviderError } from '@kbn/inference-common';
 import {
   type IdentifyFeaturesResult,
   type BaseFeature,
+  type FeatureWithFilter,
   isComputedFeature,
   getStreamTypeFromDefinition,
 } from '@kbn/streams-schema';
+import { compact } from 'lodash';
 import { identifyFeatures, generateAllComputedFeatures } from '@kbn/streams-ai';
 import { getSampleDocuments } from '@kbn/ai-tools/src/tools/describe_dataset/get_sample_documents';
+import { conditionToQueryDsl, getConditionFields } from '@kbn/streamlang';
 import { v4 as uuid, v5 as uuidv5 } from 'uuid';
 import { getDeleteTaskRunResult } from '@kbn/task-manager-plugin/server/task';
 import type { LogMeta } from '@kbn/logging';
+import type { QueryDslQueryContainer } from '@kbn/data-views-plugin/common/types';
 import { getErrorMessage } from '../../streams/errors/parse_error';
 import { formatInferenceProviderError } from '../../../routes/utils/create_connector_sse_error';
 import { resolveConnectorId } from '../../../routes/utils/resolve_connector_id';
@@ -28,6 +32,16 @@ import { cancellableTask } from '../cancellable_task';
 import { MAX_FEATURE_AGE_MS } from '../../streams/feature/feature_client';
 import { isDefinitionNotFoundError } from '../../streams/errors/definition_not_found_error';
 import type { StreamsFeaturesIdentifiedProps } from '../../telemetry';
+
+const SAMPLE_BUDGET = 20;
+const ENTITY_FILTERED_BUDGET = Math.round(SAMPLE_BUDGET * 0.6);
+
+function buildEntityExclusionFilter(features: FeatureWithFilter[]): QueryDslQueryContainer | undefined {
+  if (features.length === 0) {
+    return undefined;
+  }
+  return { bool: { must_not: features.map(({ filter }) => conditionToQueryDsl(filter)) } };
+}
 
 export interface FeaturesIdentificationTaskParams {
   start: number;
@@ -105,13 +119,68 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 const boundInferenceClient = inferenceClient.bindTo({ connectorId });
                 const esClient = scopedClusterClient.asCurrentUser;
 
-                const { hits: sampleDocuments } = await getSampleDocuments({
-                  esClient,
-                  index: stream.name,
-                  start,
-                  end,
-                  size: 20,
-                });
+                const { hits: existingFeatures } = await featureClient.getFeatures(stream.name);
+
+                const featuresWithFilter = existingFeatures.filter(
+                  (feature) => feature.filter
+                ) as FeatureWithFilter[];
+
+                const entityExclusionFilter = buildEntityExclusionFilter(featuresWithFilter);
+
+                // Detect fields used in the entity filters that are not mapped in the index,
+                // and inject them as keyword runtime mappings so the must_not clauses don't fail.
+                let entityFilterRuntimeMappings: Record<string, { type: 'keyword' }> = {};
+                if (entityExclusionFilter) {
+                  const usedFields = [
+                    ...new Set(
+                      featuresWithFilter.flatMap(({ filter }) =>
+                        getConditionFields(filter).map(({ name }) => name)
+                      )
+                    ),
+                  ];
+                  if (usedFields.length > 0) {
+                    const fieldCaps = await esClient.fieldCaps({ index: stream.name, fields: usedFields });
+                    entityFilterRuntimeMappings = Object.fromEntries(
+                      usedFields
+                        .filter((field) => !fieldCaps.fields[field])
+                        .map((field) => [field, { type: 'keyword' as const }])
+                    );
+                  }
+                }
+
+                const [{ hits: entityFilteredDocs }, { hits: unfilteredDocs }] = await Promise.all(
+                  [
+                    entityExclusionFilter
+                      ? getSampleDocuments({
+                        esClient,
+                        index: stream.name,
+                        start,
+                        end,
+                        size: ENTITY_FILTERED_BUDGET,
+                        filter: entityExclusionFilter,
+                        runtime_mappings: entityFilterRuntimeMappings,
+                      })
+                      : Promise.resolve({ hits: [], total: 0 }),
+                    getSampleDocuments({
+                      esClient,
+                      index: stream.name,
+                      start,
+                      end,
+                      size: SAMPLE_BUDGET,
+                    }),
+                  ]
+                );
+
+                console.log(JSON.stringify(entityExclusionFilter, null, 2));
+                console.log(JSON.stringify(entityFilterRuntimeMappings, null, 2));
+                console.log('entityFilteredDocs length', entityFilteredDocs.length);
+
+                const seenIds = new Set<string>(compact(entityFilteredDocs.map(({ _id }) => _id)));
+                const backfill = unfilteredDocs.filter(({ _id }) => _id && !seenIds.has(_id));
+                const sampleDocuments = [
+                  ...entityFilteredDocs,
+                  ...backfill.slice(0, SAMPLE_BUDGET - entityFilteredDocs.length),
+                ];
 
                 if (sampleDocuments.length === 0) {
                   taskContext.logger.debug(
@@ -155,8 +224,6 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   ...computedFeatures,
                 ];
 
-                const { hits: existingFeatures } = await featureClient.getFeatures(stream.name);
-
                 let newFeaturesCount = inferredBaseFeatures.length;
                 const now = Date.now();
                 const features = identifiedFeatures.map((feature) => {
@@ -169,8 +236,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                     newFeaturesCount--;
                     taskContext.logger.debug(
                       () =>
-                        `Overwriting feature with id [${
-                          feature.id
+                        `Overwriting feature with id [${feature.id
                         }] since it already exists.\nExisting feature: ${JSON.stringify(
                           existing
                         )}\nNew feature: ${JSON.stringify(feature)}`

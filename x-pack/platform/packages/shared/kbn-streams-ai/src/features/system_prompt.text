@@ -68,7 +68,6 @@ Schema features describe the **log schema family** evident from field names and 
 - **Prefer the simplest valid filter**: start with a single equality when it is selective enough; use `and` only when needed to disambiguate; use `or` only for true alternatives of the same component.
 - **Filter quality constraints**: Prefer stable, selective fields (for example, service/component names). Avoid broad filters that match most documents (for example, `agent.name=filebeat`) and avoid high-cardinality or instance-like values (pod names, hostnames, container IDs, request/trace IDs, IPs).
 - **Filter-evidence consistency**: every field/value used in `filter` must appear in, or be directly justified by, the feature's `evidence`.
-- **Require sufficient evidence**: Do not speculatively create entities. Only emit an entity when the log evidence clearly identifies a distinct, named system component.
 - **Keep rules generic**: Entity identification is not tied to specific technologies or log patterns. Any log evidence that reveals a distinct, named system component qualifies.
 
 ## Consolidation Rules
@@ -104,8 +103,6 @@ ID rules:
 - Keep it concise (typically 2-5 tokens)
 
 ## Properties vs Meta Fields
-
-The `properties` field MUST contain **stable, low-cardinality key facts** that enable deduplication across many log lines and deployments.
 
 - Use `properties` for: entity name, cloud provider (`aws`, `gcp`, `azure`), technology/library name, protocol, major/normalized version, stable service names
 - Use `meta` for: supplementary details like regions/availability zones, hostnames, instance IDs, pod/container names, IPs, URLs/paths, request/trace IDs, endpoint lists, build hashes/edition labels, contextual notes, security observations, or any interesting information that doesn't fit as a stable property
@@ -375,5 +372,4 @@ Version formatting rules (important for vulnerability analysis):
 - Entity filters: for each emitted entity, include a valid `filter` unless there is no stable/selective condition available from evidence.
 - Schema: when multiple schema families are evident (e.g. ECS and OTel), emit one schema feature per family; keep each schema feature's `properties` short (`schema_family`, optional `ecs_version` only).
 
-Extract all features that meet the confidence threshold and have supporting evidence.
 Build one complete, deduplicated feature list internally, then call **finalize_features** exactly once.

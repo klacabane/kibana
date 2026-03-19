@@ -17,31 +17,24 @@ import {
 import { compact } from 'lodash';
 import { identifyFeatures, generateAllComputedFeatures } from '@kbn/streams-ai';
 import { getSampleDocuments } from '@kbn/ai-tools/src/tools/describe_dataset/get_sample_documents';
-import { conditionToQueryDsl, getConditionFields } from '@kbn/streamlang';
+import { getConditionFields } from '@kbn/streamlang';
 import { v4 as uuid, v5 as uuidv5 } from 'uuid';
 import { getDeleteTaskRunResult } from '@kbn/task-manager-plugin/server/task';
 import type { LogMeta } from '@kbn/logging';
-import type { QueryDslQueryContainer } from '@kbn/data-views-plugin/common/types';
-import { getErrorMessage } from '../../streams/errors/parse_error';
-import { formatInferenceProviderError } from '../../../routes/utils/create_connector_sse_error';
-import { resolveConnectorId } from '../../../routes/utils/resolve_connector_id';
-import type { TaskContext } from '.';
-import type { TaskParams } from '../types';
-import { PromptsConfigService } from '../../saved_objects/significant_events/prompts_config_service';
-import { cancellableTask } from '../cancellable_task';
-import { MAX_FEATURE_AGE_MS } from '../../streams/feature/feature_client';
-import { isDefinitionNotFoundError } from '../../streams/errors/definition_not_found_error';
-import type { StreamsFeaturesIdentifiedProps } from '../../telemetry';
+import { parseError } from '../../../streams/errors/parse_error';
+import { buildEntityExclusionFilter } from './build_entity_exclusion_filter';
+import { formatInferenceProviderError } from '../../../../routes/utils/create_connector_sse_error';
+import { resolveConnectorId } from '../../../../routes/utils/resolve_connector_id';
+import type { TaskContext } from '..';
+import type { TaskParams } from '../../types';
+import { PromptsConfigService } from '../../../saved_objects/significant_events/prompts_config_service';
+import { cancellableTask } from '../../cancellable_task';
+import { MAX_FEATURE_AGE_MS } from '../../../streams/feature/feature_client';
+import { isDefinitionNotFoundError } from '../../../streams/errors/definition_not_found_error';
+import type { StreamsFeaturesIdentifiedProps } from '../../../telemetry';
 
 const SAMPLE_BUDGET = 20;
 const ENTITY_FILTERED_BUDGET = Math.round(SAMPLE_BUDGET * 0.6);
-
-function buildEntityExclusionFilter(features: FeatureWithFilter[]): QueryDslQueryContainer | undefined {
-  if (features.length === 0) {
-    return undefined;
-  }
-  return { bool: { must_not: features.map(({ filter }) => conditionToQueryDsl(filter)) } };
-}
 
 export interface FeaturesIdentificationTaskParams {
   start: number;
@@ -285,7 +278,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
 
                 const errorMessage = isInferenceProviderError(error)
                   ? formatInferenceProviderError(error, connector)
-                  : getErrorMessage(error);
+                  : parseError(error).message;
 
                 if (
                   errorMessage.includes('ERR_CANCELED') ||

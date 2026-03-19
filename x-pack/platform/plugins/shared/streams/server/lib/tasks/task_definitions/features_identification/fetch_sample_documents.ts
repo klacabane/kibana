@@ -12,8 +12,8 @@ import { getConditionFields } from '@kbn/streamlang';
 import { compact } from 'lodash';
 import { buildEntityExclusionFilter } from './build_entity_exclusion_filter';
 
-export const SAMPLE_BUDGET = 20;
-export const ENTITY_FILTERED_BUDGET = Math.round(SAMPLE_BUDGET * 0.6);
+const DEFAULT_SAMPLE_SIZE = 20;
+const ENTITY_FILTERED_RATIO = 0.6;
 
 export async function fetchSampleDocuments({
   esClient,
@@ -21,16 +21,18 @@ export async function fetchSampleDocuments({
   start,
   end,
   features,
+  size = DEFAULT_SAMPLE_SIZE,
 }: {
   esClient: ElasticsearchClient;
   index: string;
   start: number;
   end: number;
   features: FeatureWithFilter[];
+  size?: number;
 }) {
   const entityExclusionFilter = buildEntityExclusionFilter(features);
   if (!entityExclusionFilter) {
-    const { hits } = await getSampleDocuments({ esClient, index, start, end, size: SAMPLE_BUDGET });
+    const { hits } = await getSampleDocuments({ esClient, index, start, end, size });
     return hits;
   }
 
@@ -48,13 +50,14 @@ export async function fetchSampleDocuments({
       .map((field) => [field, { type: 'keyword' as const }])
   );
 
+  const entityFilteredSize = Math.round(size * ENTITY_FILTERED_RATIO);
   const [{ hits: entityFilteredDocs }, { hits: unfilteredDocs }] = await Promise.all([
     getSampleDocuments({
       esClient,
       index,
       start,
       end,
-      size: ENTITY_FILTERED_BUDGET,
+      size: entityFilteredSize,
       filter: entityExclusionFilter,
       runtime_mappings: entityFilterRuntimeMappings,
     }),
@@ -63,7 +66,7 @@ export async function fetchSampleDocuments({
       index,
       start,
       end,
-      size: SAMPLE_BUDGET,
+      size,
     }),
   ]);
 
@@ -72,6 +75,6 @@ export async function fetchSampleDocuments({
 
   return [
     ...entityFilteredDocs,
-    ...backfill.slice(0, SAMPLE_BUDGET - entityFilteredDocs.length),
+    ...backfill.slice(0, size - entityFilteredDocs.length),
   ];
 }

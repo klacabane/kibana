@@ -109,16 +109,12 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
 
                 const { hits: existingFeatures } = await featureClient.getFeatures(stream.name);
 
-                const featuresWithFilter = existingFeatures.filter(
-                  (feature) => feature.filter
-                ) as FeatureWithFilter[];
-
                 const sampleDocuments = await fetchSampleDocuments({
                   esClient,
                   index: stream.name,
                   start,
                   end,
-                  features: featuresWithFilter,
+                  features: existingFeatures.filter((feature) => feature.filter) as FeatureWithFilter[],
                 });
 
                 if (sampleDocuments.length === 0) {

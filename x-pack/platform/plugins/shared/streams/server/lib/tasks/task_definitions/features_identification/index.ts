@@ -10,9 +10,9 @@ import { isInferenceProviderError } from '@kbn/inference-common';
 import {
   type IdentifyFeaturesResult,
   type BaseFeature,
-  type FeatureWithFilter,
   isComputedFeature,
   getStreamTypeFromDefinition,
+  isFeatureWithFilter,
 } from '@kbn/streams-schema';
 import { identifyFeatures, generateAllComputedFeatures } from '@kbn/streams-ai';
 import { v4 as uuid, v5 as uuidv5 } from 'uuid';
@@ -114,7 +114,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   index: stream.name,
                   start,
                   end,
-                  features: existingFeatures.filter((feature) => feature.filter) as FeatureWithFilter[],
+                  features: existingFeatures.filter(isFeatureWithFilter)
                 });
 
                 if (sampleDocuments.length === 0) {

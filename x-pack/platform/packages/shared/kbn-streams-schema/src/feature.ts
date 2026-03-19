@@ -60,6 +60,11 @@ export function isFeature(feature: unknown): feature is Feature {
   return featureSchema.safeParse(feature).success;
 }
 
+export function isFeatureWithFilter(feature: unknown): feature is FeatureWithFilter {
+  const result = featureSchema.safeParse(feature);
+  return result.success && 'filter' in result.data;
+}
+
 export function isComputedFeature(feature: BaseFeature): boolean {
   return (COMPUTED_FEATURE_TYPES as unknown as string[]).includes(feature.type);
 }

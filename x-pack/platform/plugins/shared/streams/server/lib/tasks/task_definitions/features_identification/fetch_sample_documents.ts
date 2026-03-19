@@ -1,0 +1,77 @@
+/*
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
+ */
+
+import type { ElasticsearchClient } from '@kbn/core/server';
+import type { FeatureWithFilter } from '@kbn/streams-schema';
+import { getSampleDocuments } from '@kbn/ai-tools/src/tools/describe_dataset/get_sample_documents';
+import { getConditionFields } from '@kbn/streamlang';
+import { compact } from 'lodash';
+import { buildEntityExclusionFilter } from './build_entity_exclusion_filter';
+
+export const SAMPLE_BUDGET = 20;
+export const ENTITY_FILTERED_BUDGET = Math.round(SAMPLE_BUDGET * 0.6);
+
+export async function fetchSampleDocuments({
+  esClient,
+  index,
+  start,
+  end,
+  features,
+}: {
+  esClient: ElasticsearchClient;
+  index: string;
+  start: number;
+  end: number;
+  features: FeatureWithFilter[];
+}) {
+  const entityExclusionFilter = buildEntityExclusionFilter(features);
+  if (!entityExclusionFilter) {
+    const { hits } = await getSampleDocuments({ esClient, index, start, end, size: SAMPLE_BUDGET });
+    return hits;
+  }
+
+  // Detect fields used in the entity filters that are not mapped in the index,
+  // and inject them as keyword runtime mappings so the must_not clauses don't fail.
+  const usedFields = [
+    ...new Set(
+      features.flatMap(({ filter }) => getConditionFields(filter).map(({ name }) => name))
+    ),
+  ];
+  const fieldCaps = await esClient.fieldCaps({ index, fields: usedFields });
+  const entityFilterRuntimeMappings: Record<string, { type: 'keyword' }> = Object.fromEntries(
+    usedFields
+      .filter((field) => !fieldCaps.fields[field])
+      .map((field) => [field, { type: 'keyword' as const }])
+  );
+
+  const [{ hits: entityFilteredDocs }, { hits: unfilteredDocs }] = await Promise.all([
+    getSampleDocuments({
+      esClient,
+      index,
+      start,
+      end,
+      size: ENTITY_FILTERED_BUDGET,
+      filter: entityExclusionFilter,
+      runtime_mappings: entityFilterRuntimeMappings,
+    }),
+    getSampleDocuments({
+      esClient,
+      index,
+      start,
+      end,
+      size: SAMPLE_BUDGET,
+    }),
+  ]);
+
+  const seenIds = new Set<string>(compact(entityFilteredDocs.map(({ _id }) => _id)));
+  const backfill = unfilteredDocs.filter(({ _id }) => _id && !seenIds.has(_id));
+
+  return [
+    ...entityFilteredDocs,
+    ...backfill.slice(0, SAMPLE_BUDGET - entityFilteredDocs.length),
+  ];
+}

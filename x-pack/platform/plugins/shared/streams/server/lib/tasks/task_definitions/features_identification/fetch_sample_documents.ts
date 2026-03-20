@@ -46,6 +46,7 @@ export async function fetchSampleDocuments({
       index,
       start,
       end,
+      timeout: '10s',
       size: entityFilteredSize,
       filter: { bool: { must_not: entityFilters.map(conditionToQueryDsl) } },
       runtime_mappings: runtimeMappings,

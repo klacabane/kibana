@@ -67,8 +67,8 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 total_tokens_used: 0,
                 inferred_total_count: 0,
                 inferred_dedup_count: 0,
-                applied_filters: 0,
                 total_filters: 0,
+                filters_capped: false,
                 has_filtered_documents: false,
                 state: 'success',
               };
@@ -111,15 +111,15 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
 
                 const { hits: existingFeatures } = await featureClient.getFeatures(stream.name);
 
-                const { documents: sampleDocuments, appliedFilters, totalFilters, hasFilteredDocuments } = await fetchSampleDocuments({
+                const { documents: sampleDocuments, totalFilters, filtersCapped, hasFilteredDocuments } = await fetchSampleDocuments({
                   esClient,
                   index: stream.name,
                   start,
                   end,
                   features: existingFeatures.filter(isFeatureWithFilter),
                 });
-                telemetryProps.applied_filters = appliedFilters;
                 telemetryProps.total_filters = totalFilters;
+                telemetryProps.filters_capped = filtersCapped;
                 telemetryProps.has_filtered_documents = hasFilteredDocuments;
 
                 if (sampleDocuments.length === 0) {

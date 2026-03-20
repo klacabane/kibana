@@ -14,6 +14,7 @@ import { getEntityFilters } from './get_entity_filters';
 
 const DEFAULT_SAMPLE_SIZE = 20;
 const ENTITY_FILTERED_RATIO = 0.6;
+const MAX_FILTERS = 10;
 
 export async function fetchSampleDocuments({
   esClient,
@@ -30,10 +31,10 @@ export async function fetchSampleDocuments({
   features: FeatureWithFilter[];
   size?: number;
 }) {
-  const entityFilters = getEntityFilters(features);
+  const entityFilters = getEntityFilters(features, MAX_FILTERS);
   if (entityFilters.length === 0) {
     const { hits } = await getSampleDocuments({ esClient, index, start, end, size });
-    return { documents: hits, appliedFilters: 0, totalFilters: 0, hasFilteredDocuments: false };
+    return { documents: hits, totalFilters: 0, filtersCapped: false, hasFilteredDocuments: false };
   }
 
   // Detect fields used in the entity filters that are not mapped in the index,
@@ -78,8 +79,8 @@ export async function fetchSampleDocuments({
       ...entityFilteredDocs,
       ...backfill.slice(0, size - entityFilteredDocs.length),
     ],
-    appliedFilters: entityFilters.length,
     totalFilters: features.length,
+    filtersCapped: features.length > MAX_FILTERS,
     hasFilteredDocuments: entityFilteredDocs.length > 0,
   };
 }

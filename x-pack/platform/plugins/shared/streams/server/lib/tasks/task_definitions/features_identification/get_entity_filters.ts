@@ -6,15 +6,14 @@
  */
 
 import type { FeatureWithFilter } from '@kbn/streams-schema';
-import { conditionToQueryDsl } from '@kbn/streamlang';
-import type { QueryDslQueryContainer } from '@kbn/data-views-plugin/common/types';
+import type { Condition } from '@kbn/streamlang';
 
 export const MAX_FILTERS = 10;
 
 export function getEntityFilters(
   features: FeatureWithFilter[],
   maxFilters = MAX_FILTERS
-): QueryDslQueryContainer[] {
+): Condition[] {
   if (features.length === 0) {
     return [];
   }
@@ -22,5 +21,5 @@ export function getEntityFilters(
   const capped = [...features]
     .sort((a, b) => b.last_seen.localeCompare(a.last_seen))
     .slice(0, maxFilters);
-  return capped.map(({ filter }) => conditionToQueryDsl(filter));
+  return capped.map(({ filter }) => filter);
 }

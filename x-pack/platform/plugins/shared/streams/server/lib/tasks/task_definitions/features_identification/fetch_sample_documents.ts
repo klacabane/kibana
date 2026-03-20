@@ -8,7 +8,8 @@
 import type { ElasticsearchClient } from '@kbn/core/server';
 import type { FeatureWithFilter } from '@kbn/streams-schema';
 import { getSampleDocuments } from '@kbn/ai-tools/src/tools/describe_dataset/get_sample_documents';
-import { getConditionFields } from '@kbn/streamlang';
+import { conditionToQueryDsl, getConditionFields } from '@kbn/streamlang';
+import type { Condition } from '@kbn/streamlang';
 import { compact } from 'lodash';
 import { getEntityFilters, MAX_FILTERS } from './get_entity_filters';
 
@@ -36,21 +37,9 @@ export async function fetchSampleDocuments({
     return { documents: hits, totalFilters: 0, filtersCapped: false, hasFilteredDocuments: false };
   }
 
-  // Detect fields used in the entity filters that are not mapped in the index,
-  // and inject them as keyword runtime mappings so the must_not clauses don't fail.
-  const usedFields = [
-    ...new Set(
-      features.flatMap(({ filter }) => getConditionFields(filter).map(({ name }) => name))
-    ),
-  ];
-  const fieldCaps = await esClient.fieldCaps({ index, fields: usedFields });
-  const entityFilterRuntimeMappings: Record<string, { type: 'keyword' }> = Object.fromEntries(
-    usedFields
-      .filter((field) => !fieldCaps.fields[field])
-      .map((field) => [field, { type: 'keyword' as const }])
-  );
-
+  const runtimeMappings = await getRuntimeMappings(esClient, index, entityFilters);
   const entityFilteredSize = Math.round(size * ENTITY_FILTERED_RATIO);
+
   const [{ hits: entityFilteredDocs }, { hits: unfilteredDocs }] = await Promise.all([
     getSampleDocuments({
       esClient,
@@ -58,8 +47,8 @@ export async function fetchSampleDocuments({
       start,
       end,
       size: entityFilteredSize,
-      filter: { bool: { must_not: entityFilters } },
-      runtime_mappings: entityFilterRuntimeMappings,
+      filter: { bool: { must_not: entityFilters.map(conditionToQueryDsl) } },
+      runtime_mappings: runtimeMappings,
     }),
     getSampleDocuments({
       esClient,
@@ -79,4 +68,22 @@ export async function fetchSampleDocuments({
     filtersCapped: features.length > MAX_FILTERS,
     hasFilteredDocuments: entityFilteredDocs.length > 0,
   };
+}
+
+async function getRuntimeMappings(esClient: ElasticsearchClient, index: string, filters: Condition[]): Promise<Record<string, { type: 'keyword' }>> {
+  const usedFields = [
+    ...new Set(
+      filters.flatMap((filter) => getConditionFields(filter).map(({ name }) => name))
+    ),
+  ];
+  if (usedFields.length === 0) {
+    return {};
+  }
+
+  const fieldCaps = await esClient.fieldCaps({ index, fields: usedFields });
+  return Object.fromEntries(
+    usedFields
+      .filter((field) => !fieldCaps.fields[field])
+      .map((field) => [field, { type: 'keyword' as const }])
+  );
 }

@@ -73,8 +73,5 @@ export async function fetchSampleDocuments({
   const seenIds = new Set<string>(compact(entityFilteredDocs.map(({ _id }) => _id)));
   const backfill = unfilteredDocs.filter(({ _id }) => _id && !seenIds.has(_id));
 
-  return [
-    ...entityFilteredDocs,
-    ...backfill.slice(0, size - entityFilteredDocs.length),
-  ];
+  return [...entityFilteredDocs, ...backfill.slice(0, size - entityFilteredDocs.length)];
 }

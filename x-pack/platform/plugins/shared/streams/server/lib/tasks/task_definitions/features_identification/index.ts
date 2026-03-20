@@ -30,7 +30,6 @@ import { MAX_FEATURE_AGE_MS } from '../../../streams/feature/feature_client';
 import { isDefinitionNotFoundError } from '../../../streams/errors/definition_not_found_error';
 import type { StreamsFeaturesIdentifiedProps } from '../../../telemetry';
 
-
 export interface FeaturesIdentificationTaskParams {
   start: number;
   end: number;
@@ -114,7 +113,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   index: stream.name,
                   start,
                   end,
-                  features: existingFeatures.filter(isFeatureWithFilter)
+                  features: existingFeatures.filter(isFeatureWithFilter),
                 });
 
                 if (sampleDocuments.length === 0) {
@@ -171,7 +170,8 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                     newFeaturesCount--;
                     taskContext.logger.debug(
                       () =>
-                        `Overwriting feature with id [${feature.id
+                        `Overwriting feature with id [${
+                          feature.id
                         }] since it already exists.\nExisting feature: ${JSON.stringify(
                           existing
                         )}\nNew feature: ${JSON.stringify(feature)}`

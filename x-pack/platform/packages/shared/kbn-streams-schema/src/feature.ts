@@ -7,7 +7,7 @@
 
 import { z } from '@kbn/zod/v4';
 import { isEqual } from 'lodash';
-import type { Condition} from '@kbn/streamlang';
+import type { Condition } from '@kbn/streamlang';
 import { conditionSchema } from '@kbn/streamlang';
 
 const featureStatus = ['active', 'stale', 'expired'] as const;

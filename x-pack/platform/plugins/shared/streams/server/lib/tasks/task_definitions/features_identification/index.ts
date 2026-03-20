@@ -111,7 +111,12 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
 
                 const { hits: existingFeatures } = await featureClient.getFeatures(stream.name);
 
-                const { documents: sampleDocuments, totalFilters, filtersCapped, hasFilteredDocuments } = await fetchSampleDocuments({
+                const {
+                  documents: sampleDocuments,
+                  totalFilters,
+                  filtersCapped,
+                  hasFilteredDocuments,
+                } = await fetchSampleDocuments({
                   esClient,
                   index: stream.name,
                   start,
@@ -176,7 +181,8 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                     newFeaturesCount--;
                     taskContext.logger.debug(
                       () =>
-                        `Overwriting feature with id [${feature.id
+                        `Overwriting feature with id [${
+                          feature.id
                         }] since it already exists.\nExisting feature: ${JSON.stringify(
                           existing
                         )}\nNew feature: ${JSON.stringify(feature)}`

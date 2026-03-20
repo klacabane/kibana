@@ -74,10 +74,7 @@ export async function fetchSampleDocuments({
   const backfill = unfilteredDocs.filter(({ _id }) => _id && !seenIds.has(_id));
 
   return {
-    documents: [
-      ...entityFilteredDocs,
-      ...backfill.slice(0, size - entityFilteredDocs.length),
-    ],
+    documents: [...entityFilteredDocs, ...backfill.slice(0, size - entityFilteredDocs.length)],
     totalFilters: features.length,
     filtersCapped: features.length > MAX_FILTERS,
     hasFilteredDocuments: entityFilteredDocs.length > 0,

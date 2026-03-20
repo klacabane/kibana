@@ -307,10 +307,10 @@ const streamsFeaturesIdentifiedSchema: RootSchema<StreamsFeaturesIdentifiedProps
       description: 'The total number of filters available in features',
     },
   },
-  filtered_documents_count: {
-    type: 'long',
+  has_filtered_documents: {
+    type: 'boolean',
     _meta: {
-      description: 'The number of documents found after applying the filters',
+      description: 'Whether the sample query found documents after filters were applied',
     },
   },
 };

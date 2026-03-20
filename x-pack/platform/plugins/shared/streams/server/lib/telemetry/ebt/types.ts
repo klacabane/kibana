@@ -57,6 +57,9 @@ interface StreamsFeaturesIdentifiedProps {
   identification_duration_ms: number;
   inferred_total_count: number;
   inferred_dedup_count: number;
+  applied_filters: number;
+  total_filters: number;
+  filtered_documents_count: number;
   input_tokens_used: number;
   output_tokens_used: number;
   total_tokens_used: number;

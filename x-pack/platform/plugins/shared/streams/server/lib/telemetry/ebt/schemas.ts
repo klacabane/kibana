@@ -97,86 +97,86 @@ const streamsDescriptionGeneratedSchema: RootSchema<StreamsDescriptionGeneratedP
 };
 
 const streamsSignificantEventsQueriesGeneratedSchema: RootSchema<StreamsSignificantEventsQueriesGeneratedProps> =
-  {
-    count: {
-      type: 'long',
-      _meta: {
-        description: 'The number of significant events queries generated',
-      },
+{
+  count: {
+    type: 'long',
+    _meta: {
+      description: 'The number of significant events queries generated',
     },
-    input_tokens_used: {
-      type: 'long',
-      _meta: {
-        description: 'The number of input tokens used for the generation request',
-      },
+  },
+  input_tokens_used: {
+    type: 'long',
+    _meta: {
+      description: 'The number of input tokens used for the generation request',
     },
-    output_tokens_used: {
-      type: 'long',
-      _meta: {
-        description: 'The number of output tokens used for the generation request',
-      },
+  },
+  output_tokens_used: {
+    type: 'long',
+    _meta: {
+      description: 'The number of output tokens used for the generation request',
     },
-    stream_type: {
-      type: 'keyword',
-      _meta: {
-        description: 'The type of the stream: wired or classic',
-      },
+  },
+  stream_type: {
+    type: 'keyword',
+    _meta: {
+      description: 'The type of the stream: wired or classic',
     },
-    stream_name: {
-      type: 'keyword',
-      _meta: {
-        description: 'The name of the Stream',
-      },
+  },
+  stream_name: {
+    type: 'keyword',
+    _meta: {
+      description: 'The name of the Stream',
     },
-    tool_usage: {
-      properties: {
-        get_stream_features: {
-          properties: {
-            calls: {
-              type: 'long',
-              _meta: {
-                description: 'The number of calls to the get_stream_features tool',
-              },
-            },
-            failures: {
-              type: 'long',
-              _meta: {
-                description: 'The number of failures to the get_stream_features tool',
-              },
-            },
-            latency_ms: {
-              type: 'long',
-              _meta: {
-                description: 'The latency of the get_stream_features tool in milliseconds',
-              },
+  },
+  tool_usage: {
+    properties: {
+      get_stream_features: {
+        properties: {
+          calls: {
+            type: 'long',
+            _meta: {
+              description: 'The number of calls to the get_stream_features tool',
             },
           },
-        },
-        add_queries: {
-          properties: {
-            calls: {
-              type: 'long',
-              _meta: {
-                description: 'The number of calls to the add_queries tool',
-              },
+          failures: {
+            type: 'long',
+            _meta: {
+              description: 'The number of failures to the get_stream_features tool',
             },
-            failures: {
-              type: 'long',
-              _meta: {
-                description: 'The number of failures to the add_queries tool',
-              },
-            },
-            latency_ms: {
-              type: 'long',
-              _meta: {
-                description: 'The latency of the add_queries tool in milliseconds',
-              },
+          },
+          latency_ms: {
+            type: 'long',
+            _meta: {
+              description: 'The latency of the get_stream_features tool in milliseconds',
             },
           },
         },
       },
+      add_queries: {
+        properties: {
+          calls: {
+            type: 'long',
+            _meta: {
+              description: 'The number of calls to the add_queries tool',
+            },
+          },
+          failures: {
+            type: 'long',
+            _meta: {
+              description: 'The number of failures to the add_queries tool',
+            },
+          },
+          latency_ms: {
+            type: 'long',
+            _meta: {
+              description: 'The latency of the add_queries tool in milliseconds',
+            },
+          },
+        },
+      },
     },
-  };
+  },
+};
 
 const streamsInsightsGeneratedSchema: RootSchema<StreamsInsightsGeneratedProps> = {
   input_tokens_used: {
@@ -201,38 +201,38 @@ const streamsInsightsGeneratedSchema: RootSchema<StreamsInsightsGeneratedProps> 
 };
 
 const streamsProcessingPipelineSuggestedSchema: RootSchema<StreamsProcessingPipelineSuggestedProps> =
-  {
-    duration_ms: {
-      type: 'long',
-      _meta: {
-        description: 'The duration of the pipeline suggestion generation in milliseconds',
-      },
+{
+  duration_ms: {
+    type: 'long',
+    _meta: {
+      description: 'The duration of the pipeline suggestion generation in milliseconds',
     },
-    steps_used: {
-      type: 'long',
-      _meta: {
-        description: 'The number of reasoning steps the LLM took to generate the suggestion',
-      },
+  },
+  steps_used: {
+    type: 'long',
+    _meta: {
+      description: 'The number of reasoning steps the LLM took to generate the suggestion',
     },
-    success: {
-      type: 'boolean',
-      _meta: {
-        description: 'Whether the pipeline suggestion was generated successfully',
-      },
+  },
+  success: {
+    type: 'boolean',
+    _meta: {
+      description: 'Whether the pipeline suggestion was generated successfully',
     },
-    stream_type: {
-      type: 'keyword',
-      _meta: {
-        description: 'The type of the stream: wired or classic',
-      },
+  },
+  stream_type: {
+    type: 'keyword',
+    _meta: {
+      description: 'The type of the stream: wired or classic',
     },
-    stream_name: {
-      type: 'keyword',
-      _meta: {
-        description: 'The name of the Stream',
-      },
+  },
+  stream_name: {
+    type: 'keyword',
+    _meta: {
+      description: 'The name of the Stream',
     },
-  };
+  },
+};
 
 const streamsFeaturesIdentifiedSchema: RootSchema<StreamsFeaturesIdentifiedProps> = {
   inferred_total_count: {
@@ -293,6 +293,24 @@ const streamsFeaturesIdentifiedSchema: RootSchema<StreamsFeaturesIdentifiedProps
     type: 'keyword',
     _meta: {
       description: 'The state of the features identification task (success, failure, or canceled)',
+    },
+  },
+  applied_filters: {
+    type: 'long',
+    _meta: {
+      description: 'The number of filters applied to the sample documents query',
+    },
+  },
+  total_filters: {
+    type: 'long',
+    _meta: {
+      description: 'The total number of filters available in features',
+    },
+  },
+  filtered_documents_count: {
+    type: 'long',
+    _meta: {
+      description: 'The number of documents found after applying the filters',
     },
   },
 };

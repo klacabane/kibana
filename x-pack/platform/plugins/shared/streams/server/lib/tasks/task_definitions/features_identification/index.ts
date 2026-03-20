@@ -67,6 +67,9 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 total_tokens_used: 0,
                 inferred_total_count: 0,
                 inferred_dedup_count: 0,
+                applied_filters: 0,
+                total_filters: 0,
+                filtered_documents_count: 0,
                 state: 'success',
               };
 
@@ -108,13 +111,16 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
 
                 const { hits: existingFeatures } = await featureClient.getFeatures(stream.name);
 
-                const { documents: sampleDocuments } = await fetchSampleDocuments({
+                const { documents: sampleDocuments, appliedFilters, totalFilters, filteredDocumentsCount } = await fetchSampleDocuments({
                   esClient,
                   index: stream.name,
                   start,
                   end,
                   features: existingFeatures.filter(isFeatureWithFilter),
                 });
+                telemetryProps.applied_filters = appliedFilters;
+                telemetryProps.total_filters = totalFilters;
+                telemetryProps.filtered_documents_count = filteredDocumentsCount;
 
                 if (sampleDocuments.length === 0) {
                   taskContext.logger.debug(
@@ -170,8 +176,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                     newFeaturesCount--;
                     taskContext.logger.debug(
                       () =>
-                        `Overwriting feature with id [${
-                          feature.id
+                        `Overwriting feature with id [${feature.id
                         }] since it already exists.\nExisting feature: ${JSON.stringify(
                           existing
                         )}\nNew feature: ${JSON.stringify(feature)}`

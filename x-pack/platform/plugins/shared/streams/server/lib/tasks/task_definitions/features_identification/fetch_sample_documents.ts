@@ -33,7 +33,7 @@ export async function fetchSampleDocuments({
   const entityFilters = getEntityFilters(features);
   if (entityFilters.length === 0) {
     const { hits } = await getSampleDocuments({ esClient, index, start, end, size });
-    return { documents: hits, appliedFilters: 0, totalFilters: 0 };
+    return { documents: hits, appliedFilters: 0, totalFilters: 0, filteredDocumentsCount: 0 };
   }
 
   // Detect fields used in the entity filters that are not mapped in the index,
@@ -80,5 +80,6 @@ export async function fetchSampleDocuments({
     ],
     appliedFilters: entityFilters.length,
     totalFilters: features.length,
+    filteredDocumentsCount: entityFilteredDocs.length,
   };
 }

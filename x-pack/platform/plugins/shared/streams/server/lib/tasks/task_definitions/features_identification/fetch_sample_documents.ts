@@ -71,11 +71,13 @@ export async function fetchSampleDocuments({
   };
 }
 
-async function getRuntimeMappings(esClient: ElasticsearchClient, index: string, filters: Condition[]): Promise<Record<string, { type: 'keyword' }>> {
+async function getRuntimeMappings(
+  esClient: ElasticsearchClient,
+  index: string,
+  filters: Condition[]
+): Promise<Record<string, { type: 'keyword' }>> {
   const usedFields = [
-    ...new Set(
-      filters.flatMap((filter) => getConditionFields(filter).map(({ name }) => name))
-    ),
+    ...new Set(filters.flatMap((filter) => getConditionFields(filter).map(({ name }) => name))),
   ];
   if (usedFields.length === 0) {
     return {};

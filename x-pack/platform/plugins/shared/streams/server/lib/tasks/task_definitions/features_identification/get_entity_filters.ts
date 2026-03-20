@@ -9,9 +9,11 @@ import type { FeatureWithFilter } from '@kbn/streams-schema';
 import { conditionToQueryDsl } from '@kbn/streamlang';
 import type { QueryDslQueryContainer } from '@kbn/data-views-plugin/common/types';
 
+export const MAX_FILTERS = 10;
+
 export function getEntityFilters(
   features: FeatureWithFilter[],
-  maxFilters = 10
+  maxFilters = MAX_FILTERS
 ): QueryDslQueryContainer[] {
   if (features.length === 0) {
     return [];

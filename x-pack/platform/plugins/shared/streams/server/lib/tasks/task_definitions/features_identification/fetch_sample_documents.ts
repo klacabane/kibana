@@ -10,11 +10,10 @@ import type { FeatureWithFilter } from '@kbn/streams-schema';
 import { getSampleDocuments } from '@kbn/ai-tools/src/tools/describe_dataset/get_sample_documents';
 import { getConditionFields } from '@kbn/streamlang';
 import { compact } from 'lodash';
-import { getEntityFilters } from './get_entity_filters';
+import { getEntityFilters, MAX_FILTERS } from './get_entity_filters';
 
 const DEFAULT_SAMPLE_SIZE = 20;
 const ENTITY_FILTERED_RATIO = 0.6;
-const MAX_FILTERS = 10;
 
 export async function fetchSampleDocuments({
   esClient,

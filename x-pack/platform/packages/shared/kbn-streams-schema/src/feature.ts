@@ -62,7 +62,7 @@ export function isFeature(feature: unknown): feature is Feature {
 
 export function isFeatureWithFilter(feature: unknown): feature is FeatureWithFilter {
   const result = featureSchema.safeParse(feature);
-  return result.success && 'filter' in result.data;
+  return result.success && conditionSchema.safeParse(result.data.filter).success;
 }
 
 export function isComputedFeature(feature: BaseFeature): boolean {

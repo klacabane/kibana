@@ -10,7 +10,7 @@ import type { FeatureWithFilter } from '@kbn/streams-schema';
 import { getSampleDocuments } from '@kbn/ai-tools/src/tools/describe_dataset/get_sample_documents';
 import { getConditionFields } from '@kbn/streamlang';
 import { compact } from 'lodash';
-import { buildEntityExclusionFilter } from './build_entity_exclusion_filter';
+import { getEntityFilters } from './get_entity_filters';
 
 const DEFAULT_SAMPLE_SIZE = 20;
 const ENTITY_FILTERED_RATIO = 0.6;
@@ -30,10 +30,10 @@ export async function fetchSampleDocuments({
   features: FeatureWithFilter[];
   size?: number;
 }) {
-  const entityExclusionFilter = buildEntityExclusionFilter(features);
-  if (!entityExclusionFilter) {
+  const entityFilters = getEntityFilters(features);
+  if (entityFilters.length === 0) {
     const { hits } = await getSampleDocuments({ esClient, index, start, end, size });
-    return hits;
+    return { documents: hits, appliedFilters: 0, totalFilters: 0 };
   }
 
   // Detect fields used in the entity filters that are not mapped in the index,
@@ -58,7 +58,7 @@ export async function fetchSampleDocuments({
       start,
       end,
       size: entityFilteredSize,
-      filter: entityExclusionFilter,
+      filter: { bool: { must_not: entityFilters } },
       runtime_mappings: entityFilterRuntimeMappings,
     }),
     getSampleDocuments({
@@ -73,5 +73,12 @@ export async function fetchSampleDocuments({
   const seenIds = new Set<string>(compact(entityFilteredDocs.map(({ _id }) => _id)));
   const backfill = unfilteredDocs.filter(({ _id }) => _id && !seenIds.has(_id));
 
-  return [...entityFilteredDocs, ...backfill.slice(0, size - entityFilteredDocs.length)];
+  return {
+    documents: [
+      ...entityFilteredDocs,
+      ...backfill.slice(0, size - entityFilteredDocs.length),
+    ],
+    appliedFilters: entityFilters.length,
+    totalFilters: features.length,
+  };
 }

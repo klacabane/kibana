@@ -108,7 +108,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
 
                 const { hits: existingFeatures } = await featureClient.getFeatures(stream.name);
 
-                const sampleDocuments = await fetchSampleDocuments({
+                const { documents: sampleDocuments } = await fetchSampleDocuments({
                   esClient,
                   index: stream.name,
                   start,

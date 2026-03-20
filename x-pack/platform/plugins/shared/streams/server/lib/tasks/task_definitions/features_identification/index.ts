@@ -96,14 +96,15 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
               taskLogger.debug(`Using connector ${connectorId} for knowledge indicator extraction`);
 
               try {
-                const [stream, { hits: existingFeatures }, { featurePromptOverride }] = await Promise.all([
-                  streamsClient.getStream(streamName),
-                  featureClient.getFeatures(streamName),
-                  new PromptsConfigService({
-                    soClient,
-                    logger: taskContext.logger,
-                  }).getPrompt(),
-                ]);
+                const [stream, { hits: existingFeatures }, { featurePromptOverride }] =
+                  await Promise.all([
+                    streamsClient.getStream(streamName),
+                    featureClient.getFeatures(streamName),
+                    new PromptsConfigService({
+                      soClient,
+                      logger: taskContext.logger,
+                    }).getPrompt(),
+                  ]);
 
                 telemetryProps.stream_type = getStreamTypeFromDefinition(stream);
 
@@ -180,7 +181,8 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                     newFeaturesCount--;
                     taskContext.logger.debug(
                       () =>
-                        `Overwriting feature with id [${feature.id
+                        `Overwriting feature with id [${
+                          feature.id
                         }] since it already exists.\nExisting feature: ${JSON.stringify(
                           existing
                         )}\nNew feature: ${JSON.stringify(feature)}`

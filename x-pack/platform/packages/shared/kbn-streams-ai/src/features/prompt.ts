@@ -22,7 +22,8 @@ const featuresSchema = {
         properties: {
           extraction_reasoning: {
             type: 'string',
-            description: 'Before defining the feature, write 1-2 sentences explaining exactly which raw log lines justify this feature. If you cannot quote exact text from the provided logs, you must not output this feature.',
+            description:
+              'Before defining the feature, write 1-2 sentences explaining exactly which raw log lines justify this feature. If you cannot quote exact text from the provided logs, you must not output this feature.',
           },
           id: {
             type: 'string',

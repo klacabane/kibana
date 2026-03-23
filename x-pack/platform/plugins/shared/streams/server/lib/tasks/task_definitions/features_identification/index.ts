@@ -7,6 +7,8 @@
 
 import type { TaskDefinitionRegistry } from '@kbn/task-manager-plugin/server';
 import { isInferenceProviderError } from '@kbn/inference-common';
+import type {
+  IgnoredFeature} from '@kbn/streams-schema';
 import {
   type IdentifyFeaturesResult,
   type BaseFeature,
@@ -14,10 +16,10 @@ import {
   isComputedFeature,
   isDuplicateFeature,
   getStreamTypeFromDefinition,
-  isFeatureWithFilter,
-  IgnoredFeature,
+  isFeatureWithFilter
 } from '@kbn/streams-schema';
-import { identifyFeatures, generateAllComputedFeatures, ExcludedFeatureSummary } from '@kbn/streams-ai';
+import type { ExcludedFeatureSummary } from '@kbn/streams-ai';
+import { identifyFeatures, generateAllComputedFeatures } from '@kbn/streams-ai';
 import { v4 as uuid, v5 as uuidv5 } from 'uuid';
 import { getDeleteTaskRunResult } from '@kbn/task-manager-plugin/server/task';
 import type { Logger, LogMeta } from '@kbn/logging';
@@ -29,7 +31,8 @@ import type { TaskContext } from '..';
 import type { TaskParams } from '../../types';
 import { PromptsConfigService } from '../../../saved_objects/significant_events/prompts_config_service';
 import { cancellableTask } from '../../cancellable_task';
-import { FeatureClient, MAX_FEATURE_AGE_MS } from '../../../streams/feature/feature_client';
+import type { FeatureClient} from '../../../streams/feature/feature_client';
+import { MAX_FEATURE_AGE_MS } from '../../../streams/feature/feature_client';
 import { isDefinitionNotFoundError } from '../../../streams/errors/definition_not_found_error';
 import type { StreamsFeaturesIdentifiedProps } from '../../../telemetry';
 

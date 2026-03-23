@@ -5,9 +5,9 @@
  * 2.0.
  */
 
-import { get } from 'lodash';
+import { get, partition } from 'lodash';
 import { selectEvaluators } from '@kbn/evals';
-import type { BaseFeature } from '@kbn/streams-schema';
+import { isFeatureWithFilter, type BaseFeature } from '@kbn/streams-schema';
 import type { EvaluationCriterion, Evaluator } from '@kbn/evals';
 import type { SearchHit } from '@elastic/elasticsearch/lib/api/types';
 import { createScenarioCriteriaLlmEvaluator } from './scenario_criteria_llm_evaluator';
@@ -35,6 +35,7 @@ export interface KIFeatureExtractionEvaluationExample {
     max_confidence?: number;
     required_types?: ValidKIFeatureType[];
     forbidden_types?: ValidKIFeatureType[];
+    expect_entity_filters?: boolean;
     expected_ground_truth: string;
     expected?: string;
   };
@@ -91,8 +92,8 @@ const typeValidationEvaluator = {
       explanation:
         invalidFeatures.length > 0
           ? `Invalid types: ${invalidFeatures
-              .map((feature) => `"${feature.id}" has type "${feature.type}"`)
-              .join('; ')} (expected one of: ${VALID_KI_FEATURE_TYPES.join(', ')})`
+            .map((feature) => `"${feature.id}" has type "${feature.type}"`)
+            .join('; ')} (expected one of: ${VALID_KI_FEATURE_TYPES.join(', ')})`
           : 'All KI features have a valid type',
       details: {
         total: features.length,
@@ -288,8 +289,8 @@ const evidenceGroundingEvaluator = {
     const docIdScore =
       totalDocIds > 0
         ? (validDocIds / totalDocIds +
-            (totalRefEvidence > 0 ? groundedRefEvidence / totalRefEvidence : 1)) /
-          2
+          (totalRefEvidence > 0 ? groundedRefEvidence / totalRefEvidence : 1)) /
+        2
         : 1;
     const score = totalDocIds > 0 ? (groundingScore + docIdScore) / 2 : groundingScore;
 
@@ -300,7 +301,7 @@ const evidenceGroundingEvaluator = {
         allIssues.length > 0
           ? `${allIssues.slice(0, 5).join('; ')}`
           : `All ${totalEvidence} evidence strings are grounded` +
-            (totalDocIds > 0 ? ` and all ${totalDocIds} doc IDs are valid` : ''),
+          (totalDocIds > 0 ? ` and all ${totalDocIds} doc IDs are valid` : ''),
       details: {
         totalEvidence,
         groundedEvidence,
@@ -372,11 +373,10 @@ const confidenceBoundsEvaluator = {
       score: violations.length === 0 ? 1 : 1 - violations.length / features.length,
       explanation:
         violations.length > 0
-          ? `${violations.length}/${
-              features.length
-            } KI features exceed max confidence ${max_confidence}: ${violations
-              .map((feature) => `"${feature.id}" (${feature.confidence})`)
-              .join(', ')}`
+          ? `${violations.length}/${features.length
+          } KI features exceed max confidence ${max_confidence}: ${violations
+            .map((feature) => `"${feature.id}" (${feature.confidence})`)
+            .join(', ')}`
           : `All KI features have confidence ≤ ${max_confidence}`,
       details: {
         max_confidence,
@@ -446,6 +446,41 @@ const typeAssertionsEvaluator = {
   },
 } satisfies KIFeatureExtractionEvaluator;
 
+/**
+ * Checks that entity-type features include a `filter` condition.
+ * Only evaluated when the scenario sets `expect_entity_filters: true`;
+ * otherwise returns score 1 (skipped).
+ */
+const filterPresenceEvaluator = {
+  name: 'filter_presence',
+  kind: 'CODE' as const,
+  evaluate: async ({ output, expected }) => {
+    if (!expected.expect_entity_filters) {
+      return { score: 1, explanation: 'Entity filter evaluation not requested — skipping' };
+    }
+
+    const features = getFeaturesFromOutput(output);
+    const entities = features.filter((f) => f.type === 'entity');
+
+    if (entities.length === 0) {
+      return { score: 1, explanation: 'No entity features — skipping filter presence check' };
+    }
+
+    const [withFilter, withoutFilter] = partition(entities, isFeatureWithFilter);
+    const score = withFilter.length / entities.length;
+    const missing = withoutFilter.map((f) => f.id);
+
+    return {
+      score,
+      explanation:
+        missing.length > 0
+          ? `${missing.length}/${entities.length} entity feature(s) missing filter: ${missing.join(', ')}`
+          : 'All entity features have a filter',
+      details: { totalEntities: entities.length, withFilter: withFilter.length, missing },
+    };
+  },
+} satisfies KIFeatureExtractionEvaluator;
+
 export const createKIFeatureExtractionEvaluators = (scenarioCriteria?: {
   criteriaFn: (criteria: EvaluationCriterion[]) => Evaluator;
   criteria: EvaluationCriterion[];
@@ -456,6 +491,7 @@ export const createKIFeatureExtractionEvaluators = (scenarioCriteria?: {
     kiFeatureCountEvaluator,
     confidenceBoundsEvaluator,
     typeAssertionsEvaluator,
+    filterPresenceEvaluator,
   ]);
 
   if (!scenarioCriteria) {

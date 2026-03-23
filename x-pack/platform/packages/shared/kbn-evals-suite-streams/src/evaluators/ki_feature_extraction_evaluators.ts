@@ -10,6 +10,7 @@ import { selectEvaluators } from '@kbn/evals';
 import { type BaseFeature } from '@kbn/streams-schema';
 import type { EvaluationCriterion, Evaluator } from '@kbn/evals';
 import type { SearchHit } from '@elastic/elasticsearch/lib/api/types';
+import { flattenObject } from '@kbn/object-utils';
 import { createScenarioCriteriaLlmEvaluator } from './scenario_criteria_llm_evaluator';
 import { matchesEvidenceText } from './evidence_text_matching';
 
@@ -218,7 +219,7 @@ const evidenceGroundingEvaluator = {
         doc._source != null && typeof doc._source === 'object'
           ? (doc._source as Record<string, unknown>)
           : undefined;
-      const resolved = source ?? doc;
+      const resolved = flattenObject(source ?? doc);
       if (id) {
         docsById.set(id, resolved);
       }

@@ -31,9 +31,14 @@ const featuresSchema = {
           },
           type: {
             type: 'string',
+            enum: ['entity', 'infrastructure', 'technology', 'dependency', 'schema'],
+            description:
+              'Feature category. Must be one of: entity, infrastructure, technology, dependency, schema.',
           },
           subtype: {
             type: 'string',
+            description:
+              'Categorization within the type (e.g. service, database, cloud_deployment, programming_language, service_dependency).',
           },
           description: {
             type: 'string',
@@ -125,7 +130,6 @@ const featuresSchema = {
           },
         },
         required: [
-          'extraction_reasoning',
           'id',
           'type',
           'subtype',

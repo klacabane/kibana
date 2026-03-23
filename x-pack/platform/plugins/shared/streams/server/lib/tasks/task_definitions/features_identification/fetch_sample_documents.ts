@@ -43,7 +43,12 @@ export async function fetchSampleDocuments({
     return { documents: hits, totalFilters: 0, filtersCapped: false, hasFilteredDocuments: false };
   }
 
-  logger.debug(() => `Fetching sample documents after excluding ${entityFilters.length} KI features (${features.length - entityFilters.length} omitted):\n${JSON.stringify(entityFilters, null, 2)}`);
+  logger.debug(
+    () =>
+      `Fetching sample documents after excluding ${entityFilters.length} KI features (${
+        features.length - entityFilters.length
+      } omitted):\n${JSON.stringify(entityFilters, null, 2)}`
+  );
 
   const runtimeMappings = await getRuntimeMappings(esClient, index, entityFilters);
   const entityFilteredSize = Math.round(size * ENTITY_FILTERED_RATIO);

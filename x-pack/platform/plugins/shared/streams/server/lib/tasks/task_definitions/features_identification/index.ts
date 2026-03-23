@@ -7,8 +7,7 @@
 
 import type { TaskDefinitionRegistry } from '@kbn/task-manager-plugin/server';
 import { isInferenceProviderError } from '@kbn/inference-common';
-import type {
-  IgnoredFeature} from '@kbn/streams-schema';
+import type { IgnoredFeature } from '@kbn/streams-schema';
 import {
   type IdentifyFeaturesResult,
   type BaseFeature,
@@ -16,7 +15,7 @@ import {
   isComputedFeature,
   isDuplicateFeature,
   getStreamTypeFromDefinition,
-  isFeatureWithFilter
+  isFeatureWithFilter,
 } from '@kbn/streams-schema';
 import type { ExcludedFeatureSummary } from '@kbn/streams-ai';
 import { identifyFeatures, generateAllComputedFeatures } from '@kbn/streams-ai';
@@ -31,7 +30,7 @@ import type { TaskContext } from '..';
 import type { TaskParams } from '../../types';
 import { PromptsConfigService } from '../../../saved_objects/significant_events/prompts_config_service';
 import { cancellableTask } from '../../cancellable_task';
-import type { FeatureClient} from '../../../streams/feature/feature_client';
+import type { FeatureClient } from '../../../streams/feature/feature_client';
 import { MAX_FEATURE_AGE_MS } from '../../../streams/feature/feature_client';
 import { isDefinitionNotFoundError } from '../../../streams/errors/definition_not_found_error';
 import type { StreamsFeaturesIdentifiedProps } from '../../../telemetry';
@@ -107,16 +106,20 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
               taskLogger.debug(`Using connector ${connectorId} for knowledge indicator extraction`);
 
               try {
-                const [stream, { hits: existingFeatures }, { hits: excludedFeatures }, { featurePromptOverride }] =
-                  await Promise.all([
-                    streamsClient.getStream(streamName),
-                    featureClient.getFeatures(streamName),
-                    featureClient.getExcludedFeatures(streamName),
-                    new PromptsConfigService({
-                      soClient,
-                      logger: taskContext.logger,
-                    }).getPrompt(),
-                  ]);
+                const [
+                  stream,
+                  { hits: existingFeatures },
+                  { hits: excludedFeatures },
+                  { featurePromptOverride },
+                ] = await Promise.all([
+                  streamsClient.getStream(streamName),
+                  featureClient.getFeatures(streamName),
+                  featureClient.getExcludedFeatures(streamName),
+                  new PromptsConfigService({
+                    soClient,
+                    logger: taskContext.logger,
+                  }).getPrompt(),
+                ]);
 
                 telemetryProps.stream_type = getStreamTypeFromDefinition(stream);
 
@@ -162,37 +165,35 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   }));
 
                 const identifyFeaturesStart = Date.now();
-                const [
-                  { features: inferredBaseFeatures, ignoredFeatures },
-                  computedFeatures,
-                ] = await Promise.all([
-                  identifyFeatures({
-                    streamName: stream.name,
-                    sampleDocuments,
-                    excludedFeatures: excludedSummaries,
-                    inferenceClient: boundInferenceClient,
-                    logger: taskContext.logger.get('features_identification'),
-                    signal: runContext.abortController.signal,
-                    systemPrompt: featurePromptOverride,
-                  })
-                    .then((result) => {
-                      telemetryProps.input_tokens_used = result.tokensUsed.prompt;
-                      telemetryProps.output_tokens_used = result.tokensUsed.completion;
-                      telemetryProps.total_tokens_used = result.tokensUsed.total;
-                      return result;
+                const [{ features: inferredBaseFeatures, ignoredFeatures }, computedFeatures] =
+                  await Promise.all([
+                    identifyFeatures({
+                      streamName: stream.name,
+                      sampleDocuments,
+                      excludedFeatures: excludedSummaries,
+                      inferenceClient: boundInferenceClient,
+                      logger: taskContext.logger.get('features_identification'),
+                      signal: runContext.abortController.signal,
+                      systemPrompt: featurePromptOverride,
                     })
-                    .finally(() => {
-                      telemetryProps.identification_duration_ms =
-                        Date.now() - identifyFeaturesStart;
+                      .then((result) => {
+                        telemetryProps.input_tokens_used = result.tokensUsed.prompt;
+                        telemetryProps.output_tokens_used = result.tokensUsed.completion;
+                        telemetryProps.total_tokens_used = result.tokensUsed.total;
+                        return result;
+                      })
+                      .finally(() => {
+                        telemetryProps.identification_duration_ms =
+                          Date.now() - identifyFeaturesStart;
+                      }),
+                    generateAllComputedFeatures({
+                      stream,
+                      start,
+                      end,
+                      esClient,
+                      logger: taskContext.logger.get('computed_features'),
                     }),
-                  generateAllComputedFeatures({
-                    stream,
-                    start,
-                    end,
-                    esClient,
-                    logger: taskContext.logger.get('computed_features'),
-                  }),
-                ]);
+                  ]);
 
                 const { features, newFeaturesCount, codeIgnoredCount } = reconcileFeatures({
                   inferredBaseFeatures,

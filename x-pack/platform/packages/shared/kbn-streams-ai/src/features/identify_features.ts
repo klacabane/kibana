@@ -83,8 +83,9 @@ export async function identifyFeatures({
     response.toolCalls
       .flatMap((toolCall) => toolCall.function.arguments.features)
       .map((feature) => {
+        const { extraction_reasoning, ...rest } = feature;
         return {
-          ...feature,
+          ...rest,
           stream_name: streamName,
           filter: tryParseFilter(feature.filter),
         };

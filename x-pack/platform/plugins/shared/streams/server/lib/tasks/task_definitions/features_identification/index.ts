@@ -122,6 +122,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   start,
                   end,
                   features: existingFeatures.filter(isFeatureWithFilter),
+                  logger: taskContext.logger,
                 });
                 telemetryProps.total_filters = totalFilters;
                 telemetryProps.filters_capped = filtersCapped;

@@ -6,6 +6,7 @@
  */
 
 import type { ElasticsearchClient } from '@kbn/core/server';
+import type { Logger } from '@kbn/logging';
 import type { FeatureWithFilter } from '@kbn/streams-schema';
 import { getSampleDocuments } from '@kbn/ai-tools/src/tools/describe_dataset/get_sample_documents';
 import { conditionToQueryDsl, getConditionFields } from '@kbn/streamlang';
@@ -14,6 +15,9 @@ import { compact } from 'lodash';
 import { getEntityFilters, MAX_FILTERS } from './get_entity_filters';
 
 const DEFAULT_SAMPLE_SIZE = 20;
+// Defines the proportion of the sample size (e.g., 60%) that should be fetched
+// from a pool that excludes known features (via must_not filters). The remaining
+// portion is backfilled with unfiltered, random documents to ensure a diverse sample.
 const ENTITY_FILTERED_RATIO = 0.6;
 
 export async function fetchSampleDocuments({
@@ -22,6 +26,7 @@ export async function fetchSampleDocuments({
   start,
   end,
   features,
+  logger,
   size = DEFAULT_SAMPLE_SIZE,
 }: {
   esClient: ElasticsearchClient;
@@ -29,6 +34,7 @@ export async function fetchSampleDocuments({
   start: number;
   end: number;
   features: FeatureWithFilter[];
+  logger: Logger;
   size?: number;
 }) {
   const entityFilters = getEntityFilters(features, MAX_FILTERS);
@@ -37,9 +43,10 @@ export async function fetchSampleDocuments({
     return { documents: hits, totalFilters: 0, filtersCapped: false, hasFilteredDocuments: false };
   }
 
+  logger.debug(() => `Fetching sample documents after excluding ${entityFilters.length} KI features (${features.length - entityFilters.length} omitted):\n${JSON.stringify(entityFilters, null, 2)}`);
+
   const runtimeMappings = await getRuntimeMappings(esClient, index, entityFilters);
   const entityFilteredSize = Math.round(size * ENTITY_FILTERED_RATIO);
-
   const [{ hits: entityFilteredDocs }, { hits: unfilteredDocs }] = await Promise.all([
     getSampleDocuments({
       esClient,

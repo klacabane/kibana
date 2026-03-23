@@ -7,7 +7,7 @@
 
 import { get, partition } from 'lodash';
 import { selectEvaluators } from '@kbn/evals';
-import { isFeatureWithFilter, type BaseFeature } from '@kbn/streams-schema';
+import { type BaseFeature } from '@kbn/streams-schema';
 import type { EvaluationCriterion, Evaluator } from '@kbn/evals';
 import type { SearchHit } from '@elastic/elasticsearch/lib/api/types';
 import { createScenarioCriteriaLlmEvaluator } from './scenario_criteria_llm_evaluator';
@@ -466,7 +466,7 @@ const filterPresenceEvaluator = {
       return { score: 1, explanation: 'No entity features — skipping filter presence check' };
     }
 
-    const [withFilter, withoutFilter] = partition(entities, isFeatureWithFilter);
+    const [withFilter, withoutFilter] = partition(entities, ({ filter }) => Boolean(filter));
     const score = withFilter.length / entities.length;
     const missing = withoutFilter.map((f) => f.id);
 

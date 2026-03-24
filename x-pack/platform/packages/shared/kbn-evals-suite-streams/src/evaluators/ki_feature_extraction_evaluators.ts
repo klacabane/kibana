@@ -5,14 +5,14 @@
  * 2.0.
  */
 
-import { get, partition } from 'lodash';
+import { partition } from 'lodash';
 import { selectEvaluators } from '@kbn/evals';
 import { type BaseFeature } from '@kbn/streams-schema';
 import type { EvaluationCriterion, Evaluator } from '@kbn/evals';
 import type { SearchHit } from '@elastic/elasticsearch/lib/api/types';
 import { flattenObject } from '@kbn/object-utils';
 import { createScenarioCriteriaLlmEvaluator } from './scenario_criteria_llm_evaluator';
-import { matchesEvidenceText } from './evidence_text_matching';
+import { isEvidenceGrounded } from './evidence_grounding';
 
 export const VALID_KI_FEATURE_TYPES = [
   'entity',
@@ -106,91 +106,6 @@ const typeValidationEvaluator = {
     };
   },
 } satisfies KIFeatureExtractionEvaluator;
-
-/**
- * Parses a `field.path=value` evidence string into key-value pairs.
- * Handles compound evidence like `"http.method=GET http.url=/api/users"`.
- * Returns an empty array if the string doesn't match the pattern.
- */
-function parseKeyValuePairs(evidence: string): Array<{ key: string; value: string }> {
-  const regex =
-    /([a-zA-Z_][a-zA-Z0-9_]*(?:\.(?:[a-zA-Z_][a-zA-Z0-9_]*|\d+))*)\s*=\s*([^\s]+(?:\s+(?![a-zA-Z_][a-zA-Z0-9_]*(?:\.(?:[a-zA-Z_][a-zA-Z0-9_]*|\d+))*\s*=)[^\s]+)*)/g;
-  const pairs: Array<{ key: string; value: string }> = [];
-  let match: RegExpExecArray | null;
-
-  while ((match = regex.exec(evidence)) !== null) {
-    pairs.push({ key: match[1], value: match[2] });
-  }
-
-  return pairs;
-}
-
-function getNestedValue(doc: Record<string, unknown>, path: string): unknown {
-  if (path in doc) {
-    return doc[path];
-  }
-
-  return get(doc, path);
-}
-
-/**
- * Recursively extracts all string values from a document object,
- * so direct-quote evidence can be matched against any field.
- */
-function getAllStringValues(doc: Record<string, unknown>): string[] {
-  const values: string[] = [];
-
-  const walk = (obj: unknown) => {
-    if (typeof obj === 'string') {
-      values.push(obj);
-    } else if (Array.isArray(obj)) {
-      for (const item of obj) {
-        walk(item);
-      }
-    } else if (obj !== null && typeof obj === 'object') {
-      for (const val of Object.values(obj as Record<string, unknown>)) {
-        walk(val);
-      }
-    }
-  };
-
-  walk(doc);
-  return values;
-}
-
-/**
- * Checks whether a single evidence string is grounded in the input documents.
- *
- * 1. `field.path=value` evidence: parses key-value pairs and checks that at
- *    least one pair matches a document field value.
- * 2. Direct quote evidence: checks if the text appears as a substring in any
- *    string value across all document fields.
- */
-function isEvidenceGrounded(evidence: string, documents: Array<Record<string, unknown>>): boolean {
-  const matchesStringValue = documents.some((doc) => {
-    const allValues = getAllStringValues(doc);
-    return allValues.some((val) => matchesEvidenceText(val, evidence));
-  });
-
-  if (matchesStringValue) {
-    return true;
-  }
-
-  const kvPairs = parseKeyValuePairs(evidence);
-  if (kvPairs.length > 0) {
-    const matchesDocumentKey = documents.some((doc) =>
-      kvPairs.some(({ key, value }) => {
-        const docValue = getNestedValue(doc, key);
-        return docValue !== undefined && String(docValue).includes(value);
-      })
-    );
-    if (matchesDocumentKey) {
-      return true;
-    }
-  }
-
-  return false;
-}
 
 /**
  * Checks that every evidence string in every KI is grounded in the input

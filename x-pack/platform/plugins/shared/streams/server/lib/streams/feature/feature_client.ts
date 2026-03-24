@@ -11,6 +11,7 @@ import type { IStorageClient } from '@kbn/storage-adapter';
 import type { BaseFeature, Feature } from '@kbn/streams-schema';
 import { isDuplicateFeature, isComputedFeature } from '@kbn/streams-schema';
 import { isNotFoundError } from '@kbn/es-errors';
+import { isConditionComplete } from '@kbn/streamlang';
 import {
   STREAM_NAME,
   FEATURE_ID,
@@ -61,7 +62,7 @@ export class FeatureClient {
     private readonly clients: {
       storageClient: IStorageClient<FeatureStorageSettings, StoredFeature>;
     }
-  ) {}
+  ) { }
 
   async clean() {
     await this.clients.storageClient.clean();
@@ -69,6 +70,12 @@ export class FeatureClient {
 
   async bulk(stream: string, operations: FeatureBulkOperation[]) {
     const resolvedOperations = await this.filterValidOperations(stream, operations);
+
+    validateFeatures(
+      resolvedOperations
+        .filter(operation => 'index' in operation)
+        .map(operation => operation.index.feature)
+    );
 
     return await this.clients.storageClient.bulk({
       operations: resolvedOperations.map((operation) => {
@@ -234,16 +241,16 @@ export class FeatureClient {
     const validHits =
       idsToValidate.length > 0
         ? (
-            await this.clients.storageClient.search({
-              size: idsToValidate.length,
-              track_total_hits: false,
-              query: {
-                bool: {
-                  filter: [{ terms: { _id: idsToValidate } }, ...termQuery(STREAM_NAME, stream)],
-                },
+          await this.clients.storageClient.search({
+            size: idsToValidate.length,
+            track_total_hits: false,
+            query: {
+              bool: {
+                filter: [{ terms: { _id: idsToValidate } }, ...termQuery(STREAM_NAME, stream)],
               },
-            })
-          ).hits.hits
+            },
+          })
+        ).hits.hits
         : [];
 
     const now = new Date().toISOString();
@@ -348,4 +355,12 @@ function fromStorage(feature: StoredFeature): Feature {
     title: feature[FEATURE_TITLE],
     filter: feature[FEATURE_FILTER],
   };
+}
+
+function validateFeatures(features: Feature[]) {
+  for (const feature of features) {
+    if (feature.filter && !isConditionComplete(feature.filter)) {
+      throw new StatusError(`Invalid feature ${feature.id}: filter is incomplete`, 400);
+    }
+  }
 }

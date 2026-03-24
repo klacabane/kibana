@@ -79,7 +79,7 @@ const typeValidationEvaluator = {
   evaluate: async ({ output }) => {
     const features = getFeaturesFromOutput(output);
     if (features.length === 0) {
-      return { score: 1, explanation: 'No KI features to validate (vacuously valid)' };
+      return { score: null, explanation: 'No KI features to validate' };
     }
 
     const invalidFeatures = features.filter(
@@ -219,6 +219,7 @@ const evidenceGroundingEvaluator = {
         doc._source != null && typeof doc._source === 'object'
           ? (doc._source as Record<string, unknown>)
           : undefined;
+      // flatten the object so we can lookup evidence keys by dotted path
       const resolved = flattenObject(source ?? doc);
       if (id) {
         docsById.set(id, resolved);
@@ -363,8 +364,8 @@ const confidenceBoundsEvaluator = {
     const features = getFeaturesFromOutput(output);
     if (features.length === 0) {
       return {
-        score: 1,
-        explanation: 'No KI features emitted — confidence bounds satisfied trivially',
+        score: null,
+        explanation: 'No KI features emitted',
       };
     }
 
@@ -401,7 +402,7 @@ const typeAssertionsEvaluator = {
     const { required_types, forbidden_types } = expected;
 
     if (!required_types?.length && !forbidden_types?.length) {
-      return { score: 1, explanation: 'No type assertions specified — skipping' };
+      return { score: null, explanation: 'No type assertions specified' };
     }
 
     const features = getFeaturesFromOutput(output);
@@ -458,14 +459,15 @@ const filterPresenceEvaluator = {
   kind: 'CODE' as const,
   evaluate: async ({ output, expected }) => {
     if (!expected.expect_entity_filters) {
-      return { score: 1, explanation: 'Entity filter evaluation not requested — skipping' };
+      return { score: null, explanation: 'Entity filter evaluation not requested — skipping' };
     }
 
     const features = getFeaturesFromOutput(output);
     const entities = features.filter((f) => f.type === 'entity');
 
     if (entities.length === 0) {
-      return { score: 1, explanation: 'No entity features — skipping filter presence check' };
+      const score = expected.required_types?.includes('entity') ? 0 : 1;
+      return { score, explanation: 'No entity features' };
     }
 
     const [withFilter, withoutFilter] = partition(entities, ({ filter }) => Boolean(filter));

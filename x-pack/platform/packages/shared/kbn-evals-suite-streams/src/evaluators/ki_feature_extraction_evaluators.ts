@@ -366,8 +366,7 @@ const typeAssertionsEvaluator = {
 
 /**
  * Checks that entity-type features include a `filter` condition.
- * Only evaluated when the scenario sets `expect_entity_filters: true`;
- * otherwise returns score 1 (skipped).
+ * Only evaluated when the scenario sets `expect_entity_filters: true`.
  */
 const filterPresenceEvaluator = {
   name: 'filter_presence',

@@ -47,6 +47,22 @@ type TermQueryFieldValue = string | boolean | number | null;
 export type RuleUnbackedFilter = 'exclude' | 'include' | 'only';
 export type SearchMode = 'keyword' | 'semantic' | 'hybrid';
 
+/**
+ * Minimum raw ELSER score threshold for semantic search results.
+ *
+ * We apply min_score directly on the raw ELSER scores rather than using
+ * `minmax` normalization because minmax is relative to the current result set:
+ * the top result always normalizes to 1.0, so irrelevant queries (e.g.,
+ * "potato" against security documents) still return hits. A raw score
+ * threshold avoids this — ELSER produces very low scores (typically < 1.0)
+ * for nonsensical or completely unrelated queries, while genuinely relevant
+ * matches score much higher (5–30+).
+ *
+ * This threshold may need tuning as the dataset evolves. If legitimate
+ * matches are being excluded, lower it; if noise creeps back in, raise it.
+ */
+const SEMANTIC_MIN_SCORE = 1;
+
 export interface QueryLinkFilters {
   ruleUnbacked?: RuleUnbackedFilter;
 }
@@ -181,7 +197,9 @@ function fromStorage(link: StoredQueryLink): QueryLink {
   } satisfies QueryLink;
 }
 
-export function buildSearchEmbeddingText(query: StreamQuery): string {
+export function buildSearchEmbeddingText(
+  query: Pick<StreamQuery, 'title' | 'description'>
+): string {
   const parts: string[] = [`Title: ${query.title}`];
   if (query.description) {
     parts.push(`Description: ${query.description}`);
@@ -500,13 +518,19 @@ export class QueryClient {
     filter: QueryDslQueryContainer[],
     query: string
   ): Promise<QueryLink[]> {
+    // min_score is applied on raw ELSER scores to filter absolute irrelevance.
+    // See SEMANTIC_MIN_SCORE constant for rationale on why we use raw scores
+    // instead of minmax normalization.
     const assetsResponse = await this.dependencies.storageClient.search({
       size: 10_000,
       track_total_hits: false,
-      query: {
-        bool: {
-          filter,
-          must: [{ match: { [QUERY_SEARCH_EMBEDDING]: query } }],
+      retriever: {
+        standard: {
+          query: {
+            match: { [QUERY_SEARCH_EMBEDDING]: query },
+          },
+          filter: { bool: { filter } },
+          min_score: SEMANTIC_MIN_SCORE,
         },
       },
     });
@@ -544,11 +568,15 @@ export class QueryClient {
                 },
               },
             },
+            // min_score on raw ELSER scores prevents low-relevance semantic
+            // matches from receiving a rank position in RRF, which would
+            // otherwise dilute the final ranking with noise.
             {
               standard: {
                 query: {
                   match: { [QUERY_SEARCH_EMBEDDING]: query },
                 },
+                min_score: SEMANTIC_MIN_SCORE,
               },
             },
           ],

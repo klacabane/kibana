@@ -76,10 +76,7 @@ function parseFieldColonValue(evidence: string): { key: string; value: string } 
   return { key: fieldMatch[1], value };
 }
 
-function matchKvPairs(
-  evidence: string,
-  pattern: RegExp
-): Array<{ key: string; value: string }> {
+function matchKvPairs(evidence: string, pattern: RegExp): Array<{ key: string; value: string }> {
   const pairs: Array<{ key: string; value: string }> = [];
   pattern.lastIndex = 0;
   let match;

@@ -31,9 +31,9 @@ export function matchesEvidenceText(value: string, evidence: string): boolean {
 
   const normalizedValue = normalizeWhitespace(value);
   if (normalizedEvidence.length <= SHORT_EVIDENCE_MAX_LENGTH) {
-    return new RegExp(
-      `(^|[^a-zA-Z0-9_])${escapeRegExp(normalizedEvidence)}($|[^a-zA-Z0-9_])`
-    ).test(normalizedValue);
+    return new RegExp(`(^|[^a-zA-Z0-9_])${escapeRegExp(normalizedEvidence)}($|[^a-zA-Z0-9_])`).test(
+      normalizedValue
+    );
   }
 
   return normalizedValue.includes(normalizedEvidence);

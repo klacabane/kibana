@@ -62,7 +62,7 @@ export class FeatureClient {
     private readonly clients: {
       storageClient: IStorageClient<FeatureStorageSettings, StoredFeature>;
     }
-  ) { }
+  ) {}
 
   async clean() {
     await this.clients.storageClient.clean();
@@ -73,8 +73,8 @@ export class FeatureClient {
 
     validateFeatures(
       resolvedOperations
-        .filter(operation => 'index' in operation)
-        .map(operation => operation.index.feature)
+        .filter((operation) => 'index' in operation)
+        .map((operation) => operation.index.feature)
     );
 
     return await this.clients.storageClient.bulk({
@@ -241,16 +241,16 @@ export class FeatureClient {
     const validHits =
       idsToValidate.length > 0
         ? (
-          await this.clients.storageClient.search({
-            size: idsToValidate.length,
-            track_total_hits: false,
-            query: {
-              bool: {
-                filter: [{ terms: { _id: idsToValidate } }, ...termQuery(STREAM_NAME, stream)],
+            await this.clients.storageClient.search({
+              size: idsToValidate.length,
+              track_total_hits: false,
+              query: {
+                bool: {
+                  filter: [{ terms: { _id: idsToValidate } }, ...termQuery(STREAM_NAME, stream)],
+                },
               },
-            },
-          })
-        ).hits.hits
+            })
+          ).hits.hits
         : [];
 
     const now = new Date().toISOString();

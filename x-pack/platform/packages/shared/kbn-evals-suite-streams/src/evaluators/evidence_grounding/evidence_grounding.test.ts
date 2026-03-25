@@ -70,6 +70,15 @@ describe('isEvidenceGrounded', () => {
     expect(isEvidenceGrounded('body.text: hello http.status:200', documents)).toBe(true);
   });
 
+  it('grounds key=value when the field path includes array index segments', () => {
+    const documents = [
+      {
+        labels: [{ key: 'deployment.environment', value: 'production' }],
+      },
+    ];
+    expect(isEvidenceGrounded('labels.0.key=deployment.environment', documents)).toBe(true);
+  });
+
   it('returns false when evidence does not match the documents', () => {
     const documents = [{ message: 'nothing here' }];
     expect(isEvidenceGrounded('http.status=500', documents)).toBe(false);

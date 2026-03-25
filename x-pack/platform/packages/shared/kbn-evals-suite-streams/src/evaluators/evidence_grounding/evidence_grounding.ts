@@ -8,7 +8,8 @@
 import { get } from 'lodash';
 import { matchesEvidenceText } from './text_matching';
 
-const FIELD_PATH_KEY = '[a-zA-Z_][a-zA-Z0-9_/\\-]*(?:\\.[a-zA-Z_][a-zA-Z0-9_/\\-]*)*';
+/** Dotted paths may include numeric segments for array indices (e.g. `labels.0.key`). */
+const FIELD_PATH_KEY = '[a-zA-Z_][a-zA-Z0-9_/\\-]*(?:\\.(?:[a-zA-Z_][a-zA-Z0-9_/\\-]*|[0-9]+))*';
 const FIELD_PATH_PATTERN = new RegExp(`^(${FIELD_PATH_KEY})`);
 const MULTI_KV_EQUALS_PATTERN = new RegExp(
   `(${FIELD_PATH_KEY})\\s*=\\s*([^\\s]+(?:\\s+(?!${FIELD_PATH_KEY}\\s*=)[^\\s]+)*)`,

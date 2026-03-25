@@ -13,15 +13,9 @@ import { createServerRoute } from '../../../create_server_route';
 import { assertSignificantEventsAccess } from '../../../utils/assert_significant_events_access';
 import { queryStatusSchema, toRuleUnbackedFilter } from '../../../utils/query_status';
 import { readSignificantEventsFromAlertsIndices } from '../../../../lib/significant_events/read_significant_events_from_alerts_indices';
+import { searchModeSchema } from '../../../utils/search_mode';
 
 const dateFromString = z.string().transform((input) => new Date(input));
-
-const searchModeSchema = z
-  .enum(['keyword', 'semantic', 'hybrid'])
-  .optional()
-  .describe(
-    'Search mode: keyword (BM25), semantic (vector), or hybrid (RRF). Defaults to hybrid when inference is available.'
-  );
 
 const requestParamsSchema = z.object({
   from: dateFromString.describe('Start of the time range'),

@@ -18,6 +18,7 @@ import { generateSignificantEventDefinitions } from '../../../lib/significant_ev
 import { previewSignificantEvents } from '../../../lib/significant_events/preview_significant_events';
 import { readSignificantEventsFromAlertsIndices } from '../../../lib/significant_events/read_significant_events_from_alerts_indices';
 import { createServerRoute } from '../../create_server_route';
+import { searchModeSchema } from '../../utils/search_mode';
 import { assertSignificantEventsAccess } from '../../utils/assert_significant_events_access';
 import { createConnectorSSEError } from '../../utils/create_connector_sse_error';
 import { getRequestAbortSignal } from '../../utils/get_request_abort_signal';
@@ -100,12 +101,7 @@ const readStreamSignificantEventsRoute = createServerRoute({
         .string()
         .optional()
         .describe('Query string to filter significant events on metadata fields'),
-      searchMode: z
-        .enum(['keyword', 'semantic', 'hybrid'])
-        .optional()
-        .describe(
-          'Search mode: keyword (BM25), semantic (vector), or hybrid (RRF). Defaults to hybrid when inference is available.'
-        ),
+      searchMode: searchModeSchema,
     }),
   }),
 

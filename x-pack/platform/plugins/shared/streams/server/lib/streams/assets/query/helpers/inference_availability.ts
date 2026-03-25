@@ -21,7 +21,7 @@ export async function checkInferenceAvailability(
   try {
     await esClient.inference.get({ inference_id: inferenceEndpointId });
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

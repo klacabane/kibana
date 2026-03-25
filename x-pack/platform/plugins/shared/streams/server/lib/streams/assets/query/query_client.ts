@@ -21,7 +21,6 @@ import {
 } from '../../../../../common/queries';
 import type { EsqlRuleParams } from '../../../rules/esql/types';
 import { AssetNotFoundError } from '../../errors/asset_not_found_error';
-import type { QUERY_FEATURE_TYPE } from '../fields';
 import {
   ASSET_ID,
   ASSET_TYPE,
@@ -62,6 +61,13 @@ export type SearchMode = 'keyword' | 'semantic' | 'hybrid';
  * matches are being excluded, lower it; if noise creeps back in, raise it.
  */
 const SEMANTIC_MIN_SCORE = 1;
+
+const SEARCH_SIZE_LIMIT = 10_000;
+
+const LEGACY_RUNTIME_MAPPINGS = {
+  [QUERY_FEATURE_NAME]: { type: 'keyword' as const },
+  [QUERY_FEATURE_FILTER]: { type: 'keyword' as const },
+};
 
 export interface QueryLinkFilters {
   ruleUnbacked?: RuleUnbackedFilter;
@@ -129,6 +135,25 @@ function wildcardQuery<T extends string>(
   return [{ wildcard: { [field]: { value: `*${value}*`, case_insensitive: true } } }];
 }
 
+function buildKeywordQuery(
+  query: string,
+  filter: QueryDslQueryContainer[]
+): QueryDslQueryContainer {
+  return {
+    bool: {
+      filter,
+      should: [
+        ...wildcardQuery(QUERY_TITLE, query),
+        ...wildcardQuery(QUERY_DESCRIPTION, query),
+        ...wildcardQuery(QUERY_KQL_BODY, query),
+        ...wildcardQuery(QUERY_FEATURE_NAME, query),
+        ...wildcardQuery(QUERY_FEATURE_FILTER, query),
+      ],
+      minimum_should_match: 1,
+    },
+  };
+}
+
 export function getQueryLinkUuid(name: string, asset: Pick<QueryLink, 'asset.id' | 'asset.type'>) {
   return objectHash({
     [STREAM_NAME]: name,
@@ -169,32 +194,24 @@ interface QueryBulkDeleteOperation {
 export type QueryBulkOperation = QueryBulkIndexOperation | QueryBulkDeleteOperation;
 
 function fromStorage(link: StoredQueryLink): QueryLink {
-  const { [QUERY_SEARCH_EMBEDDING]: _embedding, ...storageFields } = link as StoredQueryLink & {
-    [QUERY_FEATURE_NAME]: string;
-    [QUERY_FEATURE_FILTER]: string;
-    [QUERY_FEATURE_TYPE]: 'system';
-    [QUERY_EVIDENCE]?: string[];
-    [QUERY_SEARCH_EMBEDDING]?: string;
-  };
   return {
-    ...storageFields,
+    [ASSET_UUID]: link[ASSET_UUID],
+    [ASSET_ID]: link[ASSET_ID],
+    [ASSET_TYPE]: link[ASSET_TYPE],
     stream_name: link[STREAM_NAME],
-    rule_backed: storageFields[RULE_BACKED],
-    rule_id: storageFields[RULE_ID],
+    rule_backed: link[RULE_BACKED],
+    rule_id: link[RULE_ID],
     query: {
-      id: storageFields[ASSET_ID],
-      title: storageFields[QUERY_TITLE],
-      description: storageFields[QUERY_DESCRIPTION],
-      /**
-       * The storageClient migrateSource converts the `kql` and `feature` filter to esql, making safe their removal here.
-       */
+      id: link[ASSET_ID],
+      title: link[QUERY_TITLE],
+      description: link[QUERY_DESCRIPTION],
       esql: {
-        query: storageFields[QUERY_ESQL_QUERY],
+        query: link[QUERY_ESQL_QUERY],
       },
-      severity_score: storageFields[QUERY_SEVERITY_SCORE],
-      evidence: storageFields[QUERY_EVIDENCE],
+      severity_score: link[QUERY_SEVERITY_SCORE],
+      evidence: (link as Record<string, unknown>)[QUERY_EVIDENCE] as string[] | undefined,
     },
-  } satisfies QueryLink;
+  };
 }
 
 export function buildSearchEmbeddingText(
@@ -273,7 +290,7 @@ export class QueryClient {
   ): Promise<{ deleted: QueryLink[]; indexed: QueryLink[] }> {
     const name = definition.name;
     const assetsResponse = await this.dependencies.storageClient.search({
-      size: 10_000,
+      size: SEARCH_SIZE_LIMIT,
       track_total_hits: false,
       query: {
         bool: {
@@ -325,7 +342,7 @@ export class QueryClient {
     const filters = [...termsQuery(STREAM_NAME, names), ...termQuery(ASSET_TYPE, 'query')];
 
     const assetsResponse = await this.dependencies.storageClient.search({
-      size: 10_000,
+      size: SEARCH_SIZE_LIMIT,
       track_total_hits: false,
       query: {
         bool: {
@@ -360,7 +377,7 @@ export class QueryClient {
     ];
 
     const queriesResponse = await this.dependencies.storageClient.search({
-      size: 10_000,
+      size: SEARCH_SIZE_LIMIT,
       track_total_hits: false,
       query: {
         bool: {
@@ -409,7 +426,7 @@ export class QueryClient {
 
   async bulkGetByIds(name: string, ids: string[]) {
     const assetsResponse = await this.dependencies.storageClient.search({
-      size: 10_000,
+      size: SEARCH_SIZE_LIMIT,
       track_total_hits: false,
       query: {
         bool: {
@@ -490,25 +507,10 @@ export class QueryClient {
     query: string
   ): Promise<QueryLink[]> {
     const assetsResponse = await this.dependencies.storageClient.search({
-      size: 10_000,
+      size: SEARCH_SIZE_LIMIT,
       track_total_hits: false,
-      runtime_mappings: {
-        [QUERY_FEATURE_NAME]: { type: 'keyword' },
-        [QUERY_FEATURE_FILTER]: { type: 'keyword' },
-      },
-      query: {
-        bool: {
-          filter,
-          should: [
-            ...wildcardQuery(QUERY_TITLE, query),
-            ...wildcardQuery(QUERY_DESCRIPTION, query),
-            ...wildcardQuery(QUERY_KQL_BODY, query),
-            ...wildcardQuery(QUERY_FEATURE_NAME, query),
-            ...wildcardQuery(QUERY_FEATURE_FILTER, query),
-          ],
-          minimum_should_match: 1,
-        },
-      },
+      runtime_mappings: LEGACY_RUNTIME_MAPPINGS,
+      query: buildKeywordQuery(query, filter),
     });
 
     return assetsResponse.hits.hits.map((hit) => fromStorage(hit._source));
@@ -522,7 +524,7 @@ export class QueryClient {
     // See SEMANTIC_MIN_SCORE constant for rationale on why we use raw scores
     // instead of minmax normalization.
     const assetsResponse = await this.dependencies.storageClient.search({
-      size: 10_000,
+      size: SEARCH_SIZE_LIMIT,
       track_total_hits: false,
       retriever: {
         standard: {
@@ -543,29 +545,15 @@ export class QueryClient {
     query: string
   ): Promise<QueryLink[]> {
     const assetsResponse = await this.dependencies.storageClient.search({
-      size: 10_000,
+      size: SEARCH_SIZE_LIMIT,
       track_total_hits: false,
-      runtime_mappings: {
-        [QUERY_FEATURE_NAME]: { type: 'keyword' },
-        [QUERY_FEATURE_FILTER]: { type: 'keyword' },
-      },
+      runtime_mappings: LEGACY_RUNTIME_MAPPINGS,
       retriever: {
         rrf: {
           retrievers: [
             {
               standard: {
-                query: {
-                  bool: {
-                    should: [
-                      ...wildcardQuery(QUERY_TITLE, query),
-                      ...wildcardQuery(QUERY_DESCRIPTION, query),
-                      ...wildcardQuery(QUERY_KQL_BODY, query),
-                      ...wildcardQuery(QUERY_FEATURE_NAME, query),
-                      ...wildcardQuery(QUERY_FEATURE_FILTER, query),
-                    ],
-                    minimum_should_match: 1,
-                  },
-                },
+                query: buildKeywordQuery(query, []),
               },
             },
             // min_score on raw ELSER scores prevents low-relevance semantic
@@ -585,7 +573,7 @@ export class QueryClient {
               filter,
             },
           },
-          rank_window_size: 10_000,
+          rank_window_size: SEARCH_SIZE_LIMIT,
           rank_constant: 20,
         },
       },
@@ -850,29 +838,20 @@ export class QueryClient {
 
     await this.installQueries(toPromote, [], definition);
 
-    const bulkOperations = toPromote.map((link) => {
-      const document = toStorage(
-        definition,
-        {
-          [ASSET_ID]: link[ASSET_ID],
-          [ASSET_TYPE]: link[ASSET_TYPE],
-          query: link.query,
-          rule_backed: true,
-          rule_id: link.rule_id,
-        },
-        this.inferenceAvailable
-      );
-      return {
+    await this.bulkStorage(
+      definition,
+      toPromote.map((link) => ({
         index: {
-          document,
-          _id: document[ASSET_UUID],
+          asset: {
+            [ASSET_ID]: link[ASSET_ID],
+            [ASSET_TYPE]: link[ASSET_TYPE],
+            query: link.query,
+            rule_backed: true,
+            rule_id: link.rule_id,
+          },
         },
-      };
-    });
-    await this.dependencies.storageClient.bulk({
-      operations: bulkOperations,
-      throwOnFail: true,
-    });
+      }))
+    );
 
     return { promoted: toPromote.length };
   }

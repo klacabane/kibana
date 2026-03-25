@@ -13,6 +13,7 @@ import {
 import { z } from '@kbn/zod/v4';
 import { readSignificantEventsFromAlertsIndices } from '../../../../lib/significant_events/read_significant_events_from_alerts_indices';
 import { STREAMS_API_PRIVILEGES } from '../../../../../common/constants';
+import { searchModeSchema } from '../../../utils/search_mode';
 import {
   getSignificantEventsQueriesGenerationTaskId,
   SIGNIFICANT_EVENTS_QUERIES_GENERATION_TASK_TYPE,
@@ -159,12 +160,7 @@ const readAllSignificantEventsRoute = createServerRoute({
         .union([z.string().transform((val) => [val]), z.array(z.string())])
         .optional()
         .describe('Stream names to filter significant events'),
-      searchMode: z
-        .enum(['keyword', 'semantic', 'hybrid'])
-        .optional()
-        .describe(
-          'Search mode: keyword (BM25), semantic (vector), or hybrid (RRF). Defaults to hybrid when inference is available.'
-        ),
+      searchMode: searchModeSchema,
     }),
   }),
   options: {

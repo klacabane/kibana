@@ -50,7 +50,7 @@ export const queryStorageSettings = {
 export type QueryStorageSettings = typeof queryStorageSettings;
 
 export const getQueryStorageSettingsWithSemantic = (inferenceId: string): IndexStorageSettings => ({
-  name: '.kibana_streams_assets',
+  name: queryStorageSettings.name,
   schema: {
     properties: {
       ...queryStorageSettings.schema.properties,

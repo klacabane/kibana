@@ -5,7 +5,7 @@
  * 2.0.
  */
 
-import type { ElasticsearchClient } from '@kbn/core/server';
+import type { ElasticsearchClient, Logger } from '@kbn/core/server';
 import { defaultInferenceEndpoints } from '@kbn/inference-common';
 
 export function getElserInferenceId(isServerless: boolean): string {
@@ -16,12 +16,21 @@ export function getElserInferenceId(isServerless: boolean): string {
 
 export async function checkInferenceAvailability(
   esClient: ElasticsearchClient,
-  inferenceEndpointId: string
+  inferenceEndpointId: string,
+  logger?: Logger
 ): Promise<boolean> {
   try {
     await esClient.inference.get({ inference_id: inferenceEndpointId });
     return true;
-  } catch {
+  } catch (error: unknown) {
+    const statusCode = (error as { statusCode?: number }).statusCode;
+    if (statusCode !== 404) {
+      logger?.warn(
+        `Inference endpoint "${inferenceEndpointId}" check failed (status ${
+          statusCode ?? 'unknown'
+        }): ${(error as Error).message}`
+      );
+    }
     return false;
   }
 }

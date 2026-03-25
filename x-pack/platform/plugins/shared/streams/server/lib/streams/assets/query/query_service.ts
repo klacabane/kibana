@@ -48,10 +48,16 @@ export class QueryService {
     const isSignificantEventsEnabled =
       (await uiSettings.get(OBSERVABILITY_STREAMS_ENABLE_SIGNIFICANT_EVENTS)) ?? false;
 
+    // Inference availability is checked on every getClient() call (i.e. per-request),
+    // so changes to ELSER deployment status are picked up without a Kibana restart.
     const esClient = core.elasticsearch.client.asInternalUser;
     const isServerless = core.elasticsearch.getCapabilities().serverless;
     const inferenceEndpointId = getElserInferenceId(isServerless);
-    const inferenceAvailable = await checkInferenceAvailability(esClient, inferenceEndpointId);
+    const inferenceAvailable = await checkInferenceAvailability(
+      esClient,
+      inferenceEndpointId,
+      this.logger
+    );
 
     const settings: IndexStorageSettings = inferenceAvailable
       ? getQueryStorageSettingsWithSemantic(inferenceEndpointId)

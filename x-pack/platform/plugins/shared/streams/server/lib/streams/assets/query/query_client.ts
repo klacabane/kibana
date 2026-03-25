@@ -59,6 +59,9 @@ export type SearchMode = 'keyword' | 'semantic' | 'hybrid';
  *
  * This threshold may need tuning as the dataset evolves. If legitimate
  * matches are being excluded, lower it; if noise creeps back in, raise it.
+ *
+ * Validated against the seeded OTel demo dataset during implementation.
+ * See https://github.com/elastic/kibana/issues/255723 for tracking.
  */
 const SEMANTIC_MIN_SCORE = 1;
 
@@ -573,6 +576,10 @@ export class QueryClient {
               filter,
             },
           },
+          // rank_window_size matches SEARCH_SIZE_LIMIT to consider all
+          // candidates before fusing. The .kibana_streams_assets index is
+          // typically low-cardinality (hundreds of docs), so this ceiling
+          // is cheap in practice while preventing result truncation.
           rank_window_size: SEARCH_SIZE_LIMIT,
           rank_constant: 20,
         },

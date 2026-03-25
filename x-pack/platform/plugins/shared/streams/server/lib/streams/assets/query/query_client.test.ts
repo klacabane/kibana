@@ -124,7 +124,7 @@ const createNewShapeStoredDoc = (
   [ASSET_ID]: 'query-new-1',
   [RULE_ID]: 'rule-new-1',
   [QUERY_SEARCH_EMBEDDING]:
-    'Title: SSH Failed Logins\nDescription: Detects failed SSH login attempts',
+    'Stream: logs.test\nTitle: SSH Failed Logins\nDescription: Detects failed SSH login attempts',
   ...overrides,
 });
 
@@ -169,6 +169,31 @@ describe('buildSearchEmbeddingText', () => {
     expect(result).toBe(
       'Title: Alert: "Critical" <System> Failure\nDescription: Triggers when error_rate > 0.5 && status_code != 200'
     );
+  });
+
+  it('prepends stream name when provided', () => {
+    const query = createQuery();
+    const result = buildSearchEmbeddingText(query, 'logs.otel');
+
+    expect(result).toBe(
+      'Stream: logs.otel\nTitle: SSH Brute Force Detection\nDescription: Detects repeated failed SSH login attempts from a single source IP'
+    );
+  });
+
+  it('omits stream line when streamName is undefined', () => {
+    const query = createQuery();
+    const result = buildSearchEmbeddingText(query, undefined);
+
+    expect(result).toBe(
+      'Title: SSH Brute Force Detection\nDescription: Detects repeated failed SSH login attempts from a single source IP'
+    );
+  });
+
+  it('includes stream name but omits description when empty', () => {
+    const query = createQuery({ description: '' });
+    const result = buildSearchEmbeddingText(query, 'logs.ecs');
+
+    expect(result).toBe('Stream: logs.ecs\nTitle: SSH Brute Force Detection');
   });
 });
 
@@ -338,7 +363,7 @@ describe('QueryClient backward compatibility', () => {
       const indexOp = bulkCall.operations[0];
       const document = indexOp.index!.document;
       expect(document[QUERY_SEARCH_EMBEDDING]).toBe(
-        'Title: SSH Brute Force Detection\nDescription: Detects repeated failed SSH login attempts from a single source IP'
+        'Stream: logs.test\nTitle: SSH Brute Force Detection\nDescription: Detects repeated failed SSH login attempts from a single source IP'
       );
     });
 
@@ -359,7 +384,9 @@ describe('QueryClient backward compatibility', () => {
 
       const bulkCall = storageClient.bulk.mock.calls[0][0];
       const document = bulkCall.operations[0].index!.document;
-      expect(document[QUERY_SEARCH_EMBEDDING]).toBe('Title: SSH Brute Force Detection');
+      expect(document[QUERY_SEARCH_EMBEDDING]).toBe(
+        'Stream: logs.test\nTitle: SSH Brute Force Detection'
+      );
     });
   });
 

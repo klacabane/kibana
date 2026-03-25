@@ -52,18 +52,15 @@ export type SearchMode = 'keyword' | 'semantic' | 'hybrid';
  * We apply min_score directly on the raw ELSER scores rather than using
  * `minmax` normalization because minmax is relative to the current result set:
  * the top result always normalizes to 1.0, so irrelevant queries (e.g.,
- * "potato" against security documents) still return hits. A raw score
+ * "test-keyword" against security documents) still return hits. A raw score
  * threshold avoids this — ELSER produces very low scores (typically < 1.0)
  * for nonsensical or completely unrelated queries, while genuinely relevant
  * matches score much higher (5–30+).
  *
  * This threshold may need tuning as the dataset evolves. If legitimate
  * matches are being excluded, lower it; if noise creeps back in, raise it.
- *
- * Validated against the seeded OTel demo dataset during implementation.
- * See https://github.com/elastic/kibana/issues/255723 for tracking.
  */
-const SEMANTIC_MIN_SCORE = 1;
+const SEMANTIC_MIN_SCORE = 10;
 
 const SEARCH_SIZE_LIMIT = 10_000;
 
@@ -129,13 +126,14 @@ function termsQuery<T extends string>(
 
 function wildcardQuery<T extends string>(
   field: T,
-  value: TermQueryFieldValue | undefined
+  value: TermQueryFieldValue | undefined,
+  opts: { boost?: number } = {}
 ): QueryDslQueryContainer[] {
   if (value === null || value === undefined || value === '') {
     return [];
   }
 
-  return [{ wildcard: { [field]: { value: `*${value}*`, case_insensitive: true } } }];
+  return [{ wildcard: { [field]: { value: `*${value}*`, case_insensitive: true, ...opts } } }];
 }
 
 function buildKeywordQuery(
@@ -146,8 +144,8 @@ function buildKeywordQuery(
     bool: {
       filter,
       should: [
-        ...wildcardQuery(QUERY_TITLE, query),
-        ...wildcardQuery(QUERY_DESCRIPTION, query),
+        ...wildcardQuery(QUERY_TITLE, query, { boost: 3 }),
+        ...wildcardQuery(QUERY_DESCRIPTION, query, { boost: 2 }),
         ...wildcardQuery(QUERY_KQL_BODY, query),
         ...wildcardQuery(QUERY_FEATURE_NAME, query),
         ...wildcardQuery(QUERY_FEATURE_FILTER, query),
@@ -218,9 +216,14 @@ function fromStorage(link: StoredQueryLink): QueryLink {
 }
 
 export function buildSearchEmbeddingText(
-  query: Pick<StreamQuery, 'title' | 'description'>
+  query: Pick<StreamQuery, 'title' | 'description'>,
+  streamName?: string
 ): string {
-  const parts: string[] = [`Title: ${query.title}`];
+  const parts: string[] = [];
+  if (streamName) {
+    parts.push(`Stream: ${streamName}`);
+  }
+  parts.push(`Title: ${query.title}`);
   if (query.description) {
     parts.push(`Description: ${query.description}`);
   }
@@ -244,7 +247,9 @@ function toStorage(
     [QUERY_EVIDENCE]: query.evidence,
     [RULE_BACKED]: request.rule_backed,
     [RULE_ID]: link.rule_id,
-    ...(inferenceAvailable ? { [QUERY_SEARCH_EMBEDDING]: buildSearchEmbeddingText(query) } : {}),
+    ...(inferenceAvailable
+      ? { [QUERY_SEARCH_EMBEDDING]: buildSearchEmbeddingText(query, definition.name) }
+      : {}),
   } as StoredQueryLink;
 }
 

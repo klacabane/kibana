@@ -380,7 +380,7 @@ const filterPresenceEvaluator = {
     const entities = features.filter((f) => f.type === 'entity');
 
     if (entities.length === 0) {
-      const score = expected.required_types?.includes('entity') ? 0 : 1;
+      const score = expected.required_types?.includes('entity') ? 0 : null;
       return { score, explanation: 'No entity features' };
     }
 

@@ -35,38 +35,38 @@ describe('matchesEvidenceText', () => {
 
 describe('isEvidenceGrounded', () => {
   it('grounds direct quotes against any string field in the documents', () => {
-    const documents = [{ nested: { message: 'payment timeout after 30s' } }];
+    const documents = [{ 'nested.message': 'payment timeout after 30s' }];
     expect(isEvidenceGrounded('payment timeout after 30s', documents)).toBe(true);
   });
 
   it('grounds single field evidence as field.path=value', () => {
-    const documents = [{ http: { status: 200 }, message: 'ok' }];
+    const documents = [{ 'http.status': 200, message: 'ok' }];
     expect(isEvidenceGrounded('http.status=200', documents)).toBe(true);
   });
 
   it('grounds single field evidence as field.path: value', () => {
-    const documents = [{ http: { status: 200 }, message: 'ok' }];
+    const documents = [{ 'http.status': 200, message: 'ok' }];
     expect(isEvidenceGrounded('http.status: 200', documents)).toBe(true);
   });
 
   it('grounds key=value when the value contains colons after the first equals', () => {
     const documents = [
       {
-        "attributes.msg": "user: 123 sent an order (id:123)",
+        'attributes.msg': 'user: 123 sent an order (id:123)',
       },
     ];
-    expect(
-      isEvidenceGrounded('attributes.msg=user: 123 sent an order (id:123)', documents)
-    ).toBe(true);
+    expect(isEvidenceGrounded('attributes.msg=user: 123 sent an order (id:123)', documents)).toBe(
+      true
+    );
   });
 
   it('grounds combined key-value evidence when every pair matches the document', () => {
-    const documents = [{ body: { text: 'hello' }, http: { status: 200 } }];
+    const documents = [{ 'body.text': 'hello', 'http.status': 200 }];
     expect(isEvidenceGrounded('body.text=hello http.status=200', documents)).toBe(true);
   });
 
   it('grounds combined key-value evidence with colons when no equals pairs are present', () => {
-    const documents = [{ body: { text: 'hello' }, http: { status: 200 } }];
+    const documents = [{ 'body.text': 'hello', 'http.status': 200 }];
     expect(isEvidenceGrounded('body.text: hello http.status:200', documents)).toBe(true);
   });
 

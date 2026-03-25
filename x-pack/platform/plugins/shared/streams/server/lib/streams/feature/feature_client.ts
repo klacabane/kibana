@@ -69,13 +69,13 @@ export class FeatureClient {
   }
 
   async bulk(stream: string, operations: FeatureBulkOperation[]) {
-    const resolvedOperations = await this.filterValidOperations(stream, operations);
-
     validateFeatures(
-      resolvedOperations
+      operations
         .filter((operation) => 'index' in operation)
         .map((operation) => operation.index.feature)
     );
+
+    const resolvedOperations = await this.filterValidOperations(stream, operations);
 
     return await this.clients.storageClient.bulk({
       operations: resolvedOperations.map((operation) => {

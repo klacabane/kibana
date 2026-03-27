@@ -114,7 +114,7 @@ export async function fetchSampleDocuments({
     size
   );
 
-  logger.debug(() => `Sampled ${documents.length} documents (${bucketCounts[0]} entity-filtered, ${bucketCounts[1]} diverse, ${bucketCounts[2]} random). ${entityFilters.length} entity filters applied:\n${JSON.stringify(entityFilters)}`);
+  logger.debug(() => `Sampled ${documents.length} documents (${bucketCounts[0]} entity-filtered, ${bucketCounts[1]} diverse, ${bucketCounts[2]} random). ${entityFilters.length} entity filters applied (${features.length - entityFilters.length} omitted):\n${JSON.stringify(entityFilters)}`);
 
   return {
     documents,

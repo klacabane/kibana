@@ -61,7 +61,10 @@ export async function fetchSampleDocuments({
       size
     );
 
-    logger.debug(() => `Sampled ${documents.length} documents (${bucketCounts[0]} diverse, ${bucketCounts[1]} random). No entities available to filter by.`);
+    logger.debug(
+      () =>
+        `Sampled ${documents.length} documents (${bucketCounts[0]} diverse, ${bucketCounts[1]} random). No entities available to filter by.`
+    );
 
     return {
       documents,
@@ -114,7 +117,14 @@ export async function fetchSampleDocuments({
     size
   );
 
-  logger.debug(() => `Sampled ${documents.length} documents (${bucketCounts[0]} entity-filtered, ${bucketCounts[1]} diverse, ${bucketCounts[2]} random). ${entityFilters.length} entity filters applied (${features.length - entityFilters.length} omitted):\n${JSON.stringify(entityFilters)}`);
+  logger.debug(
+    () =>
+      `Sampled ${documents.length} documents (${bucketCounts[0]} entity-filtered, ${
+        bucketCounts[1]
+      } diverse, ${bucketCounts[2]} random). ${entityFilters.length} entity filters applied (${
+        features.length - entityFilters.length
+      } omitted):\n${JSON.stringify(entityFilters)}`
+  );
 
   return {
     documents,
@@ -145,7 +155,7 @@ function mergeDocuments(
       result.push(hit);
       added++;
     }
-    bucketCounts[i] = added
+    bucketCounts[i] = added;
   }
 
   return { documents: result, bucketCounts };

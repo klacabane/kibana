@@ -17,7 +17,7 @@ import { searchModeSchema } from '../../../utils/search_mode';
 
 const dateFromString = z.string().transform((input) => new Date(input));
 
-const requestParamsSchema = z.object({
+const baseRequestParamsSchema = z.object({
   from: dateFromString.describe('Start of the time range'),
   to: dateFromString.describe('End of the time range'),
   bucketSize: z.string().describe('Size of time buckets for aggregation'),
@@ -26,6 +26,9 @@ const requestParamsSchema = z.object({
     .preprocess((val) => (typeof val === 'string' ? [val] : val), z.array(z.string()))
     .optional()
     .describe('Stream names to filter significant events'),
+});
+
+const requestParamsSchema = baseRequestParamsSchema.extend({
   searchMode: searchModeSchema,
 });
 
@@ -195,7 +198,7 @@ const getDiscoveryQueriesRoute = createServerRoute({
 const getDiscoveryQueriesOccurrencesRoute = createServerRoute({
   endpoint: 'GET /internal/streams/_queries/_occurrences',
   params: z.object({
-    query: requestParamsSchema,
+    query: baseRequestParamsSchema,
   }),
   options: {
     access: 'internal',

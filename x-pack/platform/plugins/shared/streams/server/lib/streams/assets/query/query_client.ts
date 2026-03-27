@@ -40,6 +40,7 @@ import {
   STREAM_NAME,
 } from '../fields';
 import type { QueryStorageSettings } from '../storage_settings';
+import { parseError } from '../../errors/parse_error';
 import { computeRuleId } from './helpers/query';
 
 type TermQueryFieldValue = string | boolean | number | null;
@@ -480,8 +481,9 @@ export class QueryClient {
       return await this.executeFindQueries(effectiveMode, streamNames, query, filters);
     } catch (error) {
       if (effectiveMode !== 'keyword') {
+        const { message } = parseError(error);
         this.dependencies.logger.warn(
-          `Semantic search failed, falling back to keyword mode: ${(error as Error).message}`
+          `Semantic search failed, falling back to keyword mode: ${message}`
         );
         return await this.executeFindQueries('keyword', streamNames, query, filters);
       }

@@ -6,9 +6,10 @@
  */
 
 import { z } from '@kbn/zod/v4';
+import { SEARCH_MODES } from '../../../common/queries';
 
 export const searchModeSchema = z
-  .enum(['keyword', 'semantic', 'hybrid'])
+  .enum(SEARCH_MODES)
   .optional()
   .describe(
     'Search mode: keyword (BM25), semantic (vector), or hybrid (RRF). Defaults to hybrid when inference is available.'

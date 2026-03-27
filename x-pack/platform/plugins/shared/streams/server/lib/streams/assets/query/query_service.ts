@@ -24,7 +24,7 @@ import {
   RULE_BACKED,
   ASSET_UUID,
 } from '../fields';
-import { queryStorageSettings, getQueryStorageSettingsWithSemantic } from '../storage_settings';
+import { queryStorageSettings, getSemanticQueryStorageSettings } from '../storage_settings';
 import { QueryClient, type StoredQueryLink } from './query_client';
 import { computeRuleId, buildEsqlQueryFromKql } from './helpers/query';
 import { checkInferenceAvailability, getElserInferenceId } from './helpers/inference_availability';
@@ -60,7 +60,7 @@ export class QueryService {
     );
 
     const settings: IndexStorageSettings = inferenceAvailable
-      ? getQueryStorageSettingsWithSemantic(inferenceEndpointId)
+      ? getSemanticQueryStorageSettings(inferenceEndpointId)
       : queryStorageSettings;
 
     const adapter = new StorageIndexAdapter<IndexStorageSettings, StoredQueryLink>(

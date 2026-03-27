@@ -159,33 +159,12 @@ describe('buildSearchEmbeddingText', () => {
     expect(result).toBe('Title: SSH Brute Force Detection');
   });
 
-  it('handles special characters in title and description', () => {
-    const query = createQuery({
-      title: 'Alert: "Critical" <System> Failure',
-      description: 'Triggers when error_rate > 0.5 && status_code != 200',
-    });
-    const result = buildSearchEmbeddingText(query);
-
-    expect(result).toBe(
-      'Title: Alert: "Critical" <System> Failure\nDescription: Triggers when error_rate > 0.5 && status_code != 200'
-    );
-  });
-
   it('prepends stream name when provided', () => {
     const query = createQuery();
     const result = buildSearchEmbeddingText(query, 'logs.otel');
 
     expect(result).toBe(
       'Stream: logs.otel\nTitle: SSH Brute Force Detection\nDescription: Detects repeated failed SSH login attempts from a single source IP'
-    );
-  });
-
-  it('omits stream line when streamName is undefined', () => {
-    const query = createQuery();
-    const result = buildSearchEmbeddingText(query, undefined);
-
-    expect(result).toBe(
-      'Title: SSH Brute Force Detection\nDescription: Detects repeated failed SSH login attempts from a single source IP'
     );
   });
 

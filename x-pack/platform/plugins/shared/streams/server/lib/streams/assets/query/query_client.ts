@@ -18,6 +18,7 @@ import {
   type QueryLink,
   type QueryLinkRequest,
   type QueryUnlinkRequest,
+  type SearchMode,
 } from '../../../../../common/queries';
 import type { EsqlRuleParams } from '../../../rules/esql/types';
 import { AssetNotFoundError } from '../../errors/asset_not_found_error';
@@ -44,7 +45,6 @@ import { computeRuleId } from './helpers/query';
 type TermQueryFieldValue = string | boolean | number | null;
 
 export type RuleUnbackedFilter = 'exclude' | 'include' | 'only';
-export type SearchMode = 'keyword' | 'semantic' | 'hybrid';
 
 /**
  * Minimum raw ELSER score threshold for semantic search results.
@@ -133,7 +133,17 @@ function wildcardQuery<T extends string>(
     return [];
   }
 
-  return [{ wildcard: { [field]: { value: `*${value}*`, case_insensitive: true, ...opts } } }];
+  return [
+    {
+      wildcard: {
+        [field]: {
+          value: `*${value}*`,
+          case_insensitive: true,
+          ...(opts.boost !== undefined && { boost: opts.boost }),
+        },
+      },
+    },
+  ];
 }
 
 function buildKeywordQuery(
@@ -210,9 +220,16 @@ function fromStorage(link: StoredQueryLink): QueryLink {
         query: link[QUERY_ESQL_QUERY],
       },
       severity_score: link[QUERY_SEVERITY_SCORE],
+      // QUERY_EVIDENCE ('experimental.query.evidence') lives under the dynamic-disabled
+      // 'experimental' object, so it can't be added to QueryLinkStorageFields without
+      // breaking the IStorageClient Exact type check.
       evidence: (link as Record<string, unknown>)[QUERY_EVIDENCE] as string[] | undefined,
     },
   };
+}
+
+function mapSearchHits(response: { hits: { hits: Array<{ _source: StoredQueryLink }> } }) {
+  return response.hits.hits.map((hit) => fromStorage(hit._source));
 }
 
 export function buildSearchEmbeddingText(
@@ -307,9 +324,7 @@ export class QueryClient {
       },
     });
 
-    const existingQueryLinks = assetsResponse.hits.hits.map((hit) => {
-      return fromStorage(hit._source);
-    });
+    const existingQueryLinks = mapSearchHits(assetsResponse);
 
     const nextQueryLinks = links.map((link) => {
       return { ...toQueryLink(definition, link), rule_backed: link.rule_backed };
@@ -394,7 +409,7 @@ export class QueryClient {
       },
     });
 
-    return queriesResponse.hits.hits.map((hit) => fromStorage(hit._source));
+    return mapSearchHits(queriesResponse);
   }
 
   /**
@@ -450,7 +465,7 @@ export class QueryClient {
       },
     });
 
-    return assetsResponse.hits.hits.map((hit) => fromStorage(hit._source));
+    return mapSearchHits(assetsResponse);
   }
 
   async findQueries(
@@ -521,16 +536,13 @@ export class QueryClient {
       query: buildKeywordQuery(query, filter),
     });
 
-    return assetsResponse.hits.hits.map((hit) => fromStorage(hit._source));
+    return mapSearchHits(assetsResponse);
   }
 
   private async findQueriesBySemantic(
     filter: QueryDslQueryContainer[],
     query: string
   ): Promise<QueryLink[]> {
-    // min_score is applied on raw ELSER scores to filter absolute irrelevance.
-    // See SEMANTIC_MIN_SCORE constant for rationale on why we use raw scores
-    // instead of minmax normalization.
     const assetsResponse = await this.dependencies.storageClient.search({
       size: SEARCH_SIZE_LIMIT,
       track_total_hits: false,
@@ -545,7 +557,7 @@ export class QueryClient {
       },
     });
 
-    return assetsResponse.hits.hits.map((hit) => fromStorage(hit._source));
+    return mapSearchHits(assetsResponse);
   }
 
   private async findQueriesByHybrid(
@@ -564,14 +576,12 @@ export class QueryClient {
                 query: buildKeywordQuery(query, []),
               },
             },
-            // min_score on raw ELSER scores prevents low-relevance semantic
-            // matches from receiving a rank position in RRF, which would
-            // otherwise dilute the final ranking with noise.
             {
               standard: {
                 query: {
                   match: { [QUERY_SEARCH_EMBEDDING]: query },
                 },
+                // See SEMANTIC_MIN_SCORE for rationale.
                 min_score: SEMANTIC_MIN_SCORE,
               },
             },
@@ -581,28 +591,20 @@ export class QueryClient {
               filter,
             },
           },
-          // rank_window_size matches SEARCH_SIZE_LIMIT to consider all
-          // candidates before fusing. The .kibana_streams_assets index is
-          // typically low-cardinality (hundreds of docs), so this ceiling
-          // is cheap in practice while preventing result truncation.
           rank_window_size: SEARCH_SIZE_LIMIT,
           rank_constant: 20,
         },
       },
     });
 
-    return assetsResponse.hits.hits.map((hit) => fromStorage(hit._source));
+    return mapSearchHits(assetsResponse);
   }
 
   private async bulkStorage(definition: Streams.all.Definition, operations: QueryBulkOperation[]) {
     return await this.dependencies.storageClient.bulk({
       operations: operations.map((operation) => {
         if ('index' in operation) {
-          const document = toStorage(
-            definition,
-            Object.values(operation)[0].asset as QueryLinkRequest,
-            this.inferenceAvailable
-          );
+          const document = toStorage(definition, operation.index.asset, this.inferenceAvailable);
           return {
             index: {
               document,

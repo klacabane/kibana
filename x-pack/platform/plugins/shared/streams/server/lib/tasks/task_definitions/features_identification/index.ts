@@ -388,7 +388,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   featureClient.getExcludedFeatures(streamName),
                   new PromptsConfigService({
                     soClient,
-                    logger: taskContext.logger,
+                    logger: taskLogger,
                   }).getPrompt(),
                 ]);
 
@@ -407,7 +407,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                     existingFeatures,
                     excludedFeatures,
                     inferenceClient: boundInferenceClient,
-                    logger: taskContext.logger.get('features_identification'),
+                    logger: taskLogger,
                     signal: runContext.abortController.signal,
                     systemPrompt: featurePromptOverride,
                     onIterationComplete: async (it, changedFeatures) => {

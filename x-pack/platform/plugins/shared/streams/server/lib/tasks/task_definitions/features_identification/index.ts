@@ -366,7 +366,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 request: runContext.fakeRequest,
               });
 
-              const taskLogger = taskContext.logger.get('features_identification');
+              const taskLogger = taskContext.logger.get('features_identification', streamName);
               const settings = await modelSettingsClient.getSettings();
               const connectorId = await resolveConnectorId({
                 connectorId: settings.connectorIdKnowledgeIndicatorExtraction,
@@ -446,7 +446,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                     start,
                     end,
                     esClient,
-                    logger: taskContext.logger.get('computed_features'),
+                    logger: taskContext.logger.get('computed_features', streamName),
                   }),
                 ]);
 

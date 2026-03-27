@@ -6,11 +6,31 @@
  */
 
 import type { ElasticsearchClient, Logger } from '@kbn/core/server';
+import { errors, type DiagnosticResult } from '@elastic/elasticsearch';
 import { checkInferenceAvailability, getElserInferenceId } from './inference_availability';
 
 const createMockLogger = (): jest.Mocked<Pick<Logger, 'warn'>> => ({
   warn: jest.fn(),
 });
+
+const createResponseError = (
+  statusCode: number,
+  body: Record<string, unknown> = {}
+): errors.ResponseError =>
+  new errors.ResponseError({
+    statusCode,
+    body,
+    headers: {},
+    warnings: [],
+    meta: {
+      aborted: false,
+      attempts: 1,
+      connection: null,
+      context: null,
+      name: 'test',
+      request: {} as unknown as DiagnosticResult['meta']['request'],
+    },
+  });
 
 describe('getElserInferenceId', () => {
   it('returns the self-managed endpoint for non-serverless', () => {
@@ -42,7 +62,7 @@ describe('checkInferenceAvailability', () => {
   it('returns false without logging when the inference endpoint does not exist (404)', async () => {
     const esClient = {
       inference: {
-        get: jest.fn().mockRejectedValue({ statusCode: 404, message: 'Not found' }),
+        get: jest.fn().mockRejectedValue(createResponseError(404)),
       },
     } as unknown as ElasticsearchClient;
     const logger = createMockLogger();
@@ -59,7 +79,7 @@ describe('checkInferenceAvailability', () => {
   it('returns false and logs a warning for non-404 errors', async () => {
     const esClient = {
       inference: {
-        get: jest.fn().mockRejectedValue({ statusCode: 500, message: 'Internal server error' }),
+        get: jest.fn().mockRejectedValue(createResponseError(500)),
       },
     } as unknown as ElasticsearchClient;
     const logger = createMockLogger();
@@ -70,7 +90,7 @@ describe('checkInferenceAvailability', () => {
       logger as unknown as Logger
     );
     expect(result).toBe(false);
-    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Internal server error'));
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('check failed (status 500)'));
   });
 
   it('returns false and logs a warning for network errors without statusCode', async () => {

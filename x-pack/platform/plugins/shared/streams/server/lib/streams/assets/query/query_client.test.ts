@@ -431,7 +431,9 @@ describe('QueryClient backward compatibility', () => {
       const searchArgs = storageClient.search.mock.calls[0][0];
       expect(searchArgs.query).toBeDefined();
       expect(searchArgs.retriever).toBeUndefined();
-      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('inference is unavailable'));
+      expect(logger.debug).toHaveBeenCalledWith(
+        expect.stringContaining('inference is unavailable')
+      );
     });
 
     it('falls back to keyword when hybrid search throws an error', async () => {

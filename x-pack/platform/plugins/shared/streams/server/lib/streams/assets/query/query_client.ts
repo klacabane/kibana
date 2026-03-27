@@ -492,7 +492,7 @@ export class QueryClient {
   private resolveSearchMode(searchMode?: SearchMode): SearchMode {
     if (searchMode) {
       if (searchMode !== 'keyword' && !this.inferenceAvailable) {
-        this.dependencies.logger.warn(
+        this.dependencies.logger.debug(
           `Search mode "${searchMode}" requested but inference is unavailable, falling back to keyword`
         );
         return 'keyword';

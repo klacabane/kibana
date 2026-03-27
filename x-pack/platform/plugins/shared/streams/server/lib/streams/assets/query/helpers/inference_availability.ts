@@ -7,6 +7,7 @@
 
 import type { ElasticsearchClient, Logger } from '@kbn/core/server';
 import { defaultInferenceEndpoints } from '@kbn/inference-common';
+import { parseError } from '../../../errors/parse_error';
 
 export function getElserInferenceId(isServerless: boolean): string {
   return isServerless
@@ -23,12 +24,12 @@ export async function checkInferenceAvailability(
     await esClient.inference.get({ inference_id: inferenceEndpointId });
     return true;
   } catch (error: unknown) {
-    const statusCode = (error as { statusCode?: number }).statusCode;
+    const { message, statusCode } = parseError(error);
     if (statusCode !== 404) {
       logger?.warn(
         `Inference endpoint "${inferenceEndpointId}" check failed (status ${
           statusCode ?? 'unknown'
-        }): ${(error as Error).message}`
+        }): ${message}`
       );
     }
     return false;

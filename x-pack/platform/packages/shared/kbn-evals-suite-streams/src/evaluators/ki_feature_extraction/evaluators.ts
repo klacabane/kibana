@@ -154,6 +154,11 @@ const evidenceGroundingEvaluator = {
 
     for (const feature of features) {
       const evidenceList = feature.evidence ?? [];
+      if (evidenceList.length === 0) {
+        // A feature with no evidence at all is treated as one ungrounded item.
+        totalEvidence++;
+        ungroundedItems.push(`KI feature "${feature.id}": no evidence provided`);
+      }
       for (const evidence of evidenceList) {
         totalEvidence++;
         if (isEvidenceGrounded(evidence, documents)) {
@@ -193,13 +198,7 @@ const evidenceGroundingEvaluator = {
     }
 
     if (totalEvidence === 0) {
-      return {
-        score: features.length === 0 ? 1 : 0,
-        explanation:
-          features.length === 0
-            ? 'No KI features, no evidence to check'
-            : 'KI features present but none have evidence arrays',
-      };
+      return { score: 1, explanation: 'No KI features, no evidence to check' };
     }
 
     const groundingScore = groundedEvidence / totalEvidence;

@@ -100,6 +100,69 @@ describe('evidence grounding evaluator', () => {
     expect(result.score).toBe(1);
   });
 
+  it('grounds evidence with trailing "..." by matching the prefix', async () => {
+    const result = await evidenceGroundingEvaluator!.evaluate({
+      input: {
+        sample_documents: [
+          createSearchHit({
+            body: { text: '[PlaceOrder] user_id=abc123 req_id=xyz987' },
+          }),
+        ],
+      },
+      output: {
+        features: [
+          createKI({
+            id: 'checkout-service',
+            type: 'entity',
+            description: 'checkout service',
+            confidence: 80,
+            evidence: ['body.text=[PlaceOrder] user_id=...'],
+          }),
+        ],
+      },
+      expected: { criteria: [], expected_ground_truth: '' },
+      metadata: null,
+    });
+
+    expect(result.score).toBe(1);
+  });
+
+  it('penalizes features with empty evidence arrays', async () => {
+    const result = await evidenceGroundingEvaluator!.evaluate({
+      input: {
+        sample_documents: [
+          createSearchHit({
+            body: { text: 'some log message' },
+          }),
+        ],
+      },
+      output: {
+        features: [
+          createKI({
+            id: 'entity-with-evidence',
+            type: 'entity',
+            description: 'grounded entity',
+            confidence: 80,
+            evidence: ['some log message'],
+          }),
+          createKI({
+            id: 'entity-no-evidence',
+            type: 'entity',
+            description: 'entity with no evidence',
+            confidence: 80,
+            evidence: [],
+          }),
+        ],
+      },
+      expected: { criteria: [], expected_ground_truth: '' },
+      metadata: null,
+    });
+
+    // 1 grounded + 1 empty-evidence penalty = 1/2
+    expect(result.score).toBe(0.5);
+    expect(result.explanation).toContain('no evidence provided');
+  });
+
   it('supports array index paths in key value evidence', async () => {
     const result = await evidenceGroundingEvaluator!.evaluate({
       input: {

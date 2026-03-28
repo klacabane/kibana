@@ -55,6 +55,7 @@ evaluate.describe('KI feature extraction', { tag: tags.serverless.observability.
   for (const { dataset, scenario } of kiFeatureExtractionRuns) {
     evaluate.describe(`${dataset.id} / ${scenario.input.scenario_id}`, () => {
       let sampleDocuments: Array<SearchHit<Record<string, unknown>>> = [];
+      let missingApps: string[] = [];
 
       evaluate.beforeAll(async ({ esClient, log }) => {
         const source = resolveScenarioSnapshotSource({
@@ -80,7 +81,11 @@ evaluate.describe('KI feature extraction', { tag: tags.serverless.observability.
 
         await esClient.indices.refresh({ index: MANAGED_STREAM_SEARCH_PATTERN });
 
-        sampleDocuments = await collectSampleDocuments({ esClient, scenario, log });
+        ({ docs: sampleDocuments, missingApps } = await collectSampleDocuments({
+          esClient,
+          scenario,
+          log,
+        }));
         if (sampleDocuments.length === 0) {
           throw new Error(`No log documents found after replaying snapshot ${source.snapshotName}`);
         }
@@ -101,7 +106,18 @@ evaluate.describe('KI feature extraction', { tag: tags.serverless.observability.
                       ...scenario.output,
                       expected: scenario.output.expected_ground_truth,
                     },
-                    metadata: scenario.metadata,
+                    metadata: {
+                      ...scenario.metadata,
+                      ...(missingApps.length > 0
+                        ? {
+                            missing_apps: missingApps,
+                            missing_apps_note:
+                              `The following apps had no log data in the snapshot and could not be ` +
+                              `identified by the model: ${missingApps.join(', ')}. ` +
+                              `Criteria referencing these apps should be marked N/A.`,
+                          }
+                        : {}),
+                    },
                   },
                 ],
               },

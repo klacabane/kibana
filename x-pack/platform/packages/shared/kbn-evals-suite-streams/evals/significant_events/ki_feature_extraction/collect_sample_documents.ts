@@ -88,6 +88,12 @@ const addUniqueHitsToSample = ({
   }
 };
 
+export interface CollectSampleDocumentsResult {
+  docs: Array<SearchHit<Record<string, unknown>>>;
+  /** Apps referenced in scenario criteria that had no matching documents in the snapshot. */
+  missingApps: string[];
+}
+
 export const collectSampleDocuments = async ({
   esClient,
   scenario,
@@ -96,7 +102,7 @@ export const collectSampleDocuments = async ({
   esClient: Client;
   scenario: KIFeatureExtractionScenario;
   log: ToolingLog;
-}): Promise<Array<SearchHit<Record<string, unknown>>>> => {
+}): Promise<CollectSampleDocumentsResult> => {
   const query = scenario.input.log_query_filter ?? { match_all: {} };
 
   const docs: Array<SearchHit<Record<string, unknown>>> = [];
@@ -164,5 +170,5 @@ export const collectSampleDocuments = async ({
     );
   }
 
-  return docs;
+  return { docs, missingApps: remainingMissingApps };
 };

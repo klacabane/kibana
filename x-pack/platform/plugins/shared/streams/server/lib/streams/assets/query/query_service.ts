@@ -24,7 +24,7 @@ import {
   RULE_BACKED,
   ASSET_UUID,
 } from '../fields';
-import { queryStorageSettings, getSemanticQueryStorageSettings } from '../storage_settings';
+import { getQueryStorageSettings } from '../storage_settings';
 import { QueryClient, type StoredQueryLink } from './query_client';
 import { computeRuleId, buildEsqlQueryFromKql } from './helpers/query';
 import { checkInferenceAvailability, getElserInferenceId } from './helpers/inference_availability';
@@ -48,8 +48,6 @@ export class QueryService {
     const isSignificantEventsEnabled =
       (await uiSettings.get(OBSERVABILITY_STREAMS_ENABLE_SIGNIFICANT_EVENTS)) ?? false;
 
-    // Inference availability is checked on every getClient() call (i.e. per-request),
-    // so changes to ELSER deployment status are picked up without a Kibana restart.
     const esClient = core.elasticsearch.client.asInternalUser;
     const isServerless = core.elasticsearch.getCapabilities().serverless;
     const inferenceEndpointId = getElserInferenceId(isServerless);
@@ -59,9 +57,10 @@ export class QueryService {
       this.logger
     );
 
-    const settings: IndexStorageSettings = inferenceAvailable
-      ? getSemanticQueryStorageSettings(inferenceEndpointId)
-      : queryStorageSettings;
+    // The semantic_text field is always declared in the mapping regardless of
+    // inference availability — ES does not validate the inference_id at mapping
+    // time, so this is safe even when ML is disabled or ELSER is not deployed.
+    const settings = getQueryStorageSettings(inferenceEndpointId);
 
     const adapter = new StorageIndexAdapter<IndexStorageSettings, StoredQueryLink>(
       esClient,

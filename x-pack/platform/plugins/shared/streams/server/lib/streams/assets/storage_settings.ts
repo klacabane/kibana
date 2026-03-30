@@ -49,7 +49,7 @@ export const queryStorageSettings = {
 
 export type QueryStorageSettings = typeof queryStorageSettings;
 
-export const getSemanticQueryStorageSettings = (inferenceId: string): IndexStorageSettings => ({
+export const getQueryStorageSettings = (inferenceId: string): IndexStorageSettings => ({
   name: queryStorageSettings.name,
   schema: {
     properties: {

@@ -31,7 +31,9 @@ const searchKnowledgeIndicatorsSchema = z.object({
   search_text: z
     .string()
     .optional()
-    .describe('Optional. Free-text search (best-effort across stored fields).'),
+    .describe(
+      'Optional. Natural-language search with semantic ranking (hybrid keyword + vector). Descriptive phrases work better than single keywords.'
+    ),
   kind: z
     .array(z.enum(['feature', 'query']))
     .optional()

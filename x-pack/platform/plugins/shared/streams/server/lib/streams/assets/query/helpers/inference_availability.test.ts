@@ -5,119 +5,157 @@
  * 2.0.
  */
 
-import type { ElasticsearchClient, Logger } from '@kbn/core/server';
-import { errors, type DiagnosticResult } from '@elastic/elasticsearch';
-import { checkInferenceAvailability, getElserInferenceId } from './inference_availability';
+import type { ElasticsearchClient } from '@kbn/core/server';
+import { loggerMock } from '@kbn/logging-mocks';
+import { defaultInferenceEndpoints } from '@kbn/inference-common';
+import { createInferenceResolver } from './inference_availability';
 
-const createMockLogger = (): jest.Mocked<Pick<Logger, 'warn'>> => ({
-  warn: jest.fn(),
-});
+const EIS_ID = defaultInferenceEndpoints.ELSER_IN_EIS_INFERENCE_ID;
+const SELF_MANAGED_ID = defaultInferenceEndpoints.ELSER;
 
-const createResponseError = (
-  statusCode: number,
-  body: Record<string, unknown> = {}
-): errors.ResponseError =>
-  new errors.ResponseError({
-    statusCode,
-    body,
-    headers: {},
-    warnings: [],
-    meta: {
-      aborted: false,
-      attempts: 1,
-      connection: null,
-      context: null,
-      name: 'test',
-      request: {} as unknown as DiagnosticResult['meta']['request'],
+const createMockEsClient = (probeResponses: Record<string, 'ok' | 'fail'>): ElasticsearchClient => {
+  return {
+    inference: {
+      inference: jest.fn(({ inference_id: id }: { inference_id: string }) => {
+        if (probeResponses[id] === 'ok') {
+          return Promise.resolve({ inference_results: [] });
+        }
+        return Promise.reject(new Error(`Inference endpoint "${id}" not available`));
+      }),
     },
+  } as unknown as ElasticsearchClient;
+};
+
+const createMockLogger = () => loggerMock.create();
+
+describe('createInferenceResolver', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
   });
 
-describe('getElserInferenceId', () => {
-  it('returns the self-managed endpoint for non-serverless', () => {
-    expect(getElserInferenceId(false)).toBe('.elser-2-elasticsearch');
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
-  it('returns the EIS endpoint for serverless', () => {
-    expect(getElserInferenceId(true)).toBe('.elser-2-elastic');
-  });
-});
+  it('returns the EIS endpoint when it is available', async () => {
+    const logger = createMockLogger();
+    const resolve = createInferenceResolver(logger);
+    const esClient = createMockEsClient({ [EIS_ID]: 'ok', [SELF_MANAGED_ID]: 'ok' });
 
-describe('checkInferenceAvailability', () => {
-  it('returns true when the inference endpoint exists', async () => {
-    const esClient = {
-      inference: {
-        get: jest
-          .fn()
-          .mockResolvedValue({ endpoints: [{ inference_id: '.elser-2-elasticsearch' }] }),
-      },
-    } as unknown as ElasticsearchClient;
+    const result = await resolve(esClient);
 
-    const result = await checkInferenceAvailability(esClient, '.elser-2-elasticsearch');
-    expect(result).toBe(true);
-    expect(esClient.inference.get).toHaveBeenCalledWith({
-      inference_id: '.elser-2-elasticsearch',
+    expect(result).toEqual({ inferenceId: EIS_ID, available: true });
+    expect(esClient.inference.inference).toHaveBeenCalledTimes(1);
+    expect(esClient.inference.inference).toHaveBeenCalledWith({
+      inference_id: EIS_ID,
+      input: 'test',
     });
+    expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining(EIS_ID));
   });
 
-  it('returns false without logging when the inference endpoint does not exist (404)', async () => {
-    const esClient = {
-      inference: {
-        get: jest.fn().mockRejectedValue(createResponseError(404)),
-      },
-    } as unknown as ElasticsearchClient;
+  it('falls back to the self-managed endpoint when EIS is unavailable', async () => {
     const logger = createMockLogger();
+    const resolve = createInferenceResolver(logger);
+    const esClient = createMockEsClient({ [EIS_ID]: 'fail', [SELF_MANAGED_ID]: 'ok' });
 
-    const result = await checkInferenceAvailability(
-      esClient,
-      '.elser-2-elasticsearch',
-      logger as unknown as Logger
-    );
-    expect(result).toBe(false);
-    expect(logger.warn).not.toHaveBeenCalled();
+    const result = await resolve(esClient);
+
+    expect(result).toEqual({ inferenceId: SELF_MANAGED_ID, available: true });
+    expect(esClient.inference.inference).toHaveBeenCalledTimes(2);
+    expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining(SELF_MANAGED_ID));
   });
 
-  it('returns false and logs a warning for non-404 errors', async () => {
-    const esClient = {
-      inference: {
-        get: jest.fn().mockRejectedValue(createResponseError(500)),
-      },
-    } as unknown as ElasticsearchClient;
+  it('returns the preferred EIS ID with available: false when no endpoint works', async () => {
     const logger = createMockLogger();
+    const resolve = createInferenceResolver(logger);
+    const esClient = createMockEsClient({ [EIS_ID]: 'fail', [SELF_MANAGED_ID]: 'fail' });
 
-    const result = await checkInferenceAvailability(
-      esClient,
-      '.elser-2-elasticsearch',
-      logger as unknown as Logger
-    );
-    expect(result).toBe(false);
-    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('check failed (status 500)'));
+    const result = await resolve(esClient);
+
+    expect(result).toEqual({ inferenceId: EIS_ID, available: false });
+    expect(esClient.inference.inference).toHaveBeenCalledTimes(2);
+    expect(logger.debug).toHaveBeenCalledWith('No ELSER inference endpoint available');
   });
 
-  it('returns false and logs a warning for network errors without statusCode', async () => {
-    const esClient = {
-      inference: {
-        get: jest.fn().mockRejectedValue(new Error('Connection refused')),
-      },
-    } as unknown as ElasticsearchClient;
+  it('returns cached result on subsequent calls within TTL', async () => {
     const logger = createMockLogger();
+    const resolve = createInferenceResolver(logger);
+    const esClient = createMockEsClient({ [EIS_ID]: 'ok' });
 
-    const result = await checkInferenceAvailability(
-      esClient,
-      '.elser-2-elasticsearch',
-      logger as unknown as Logger
-    );
-    expect(result).toBe(false);
-    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Connection refused'));
+    const first = await resolve(esClient);
+    const second = await resolve(esClient);
+
+    expect(first).toEqual(second);
+    expect(esClient.inference.inference).toHaveBeenCalledTimes(1);
   });
 
-  it('returns false without crashing when no logger is provided', async () => {
-    const esClient = {
-      inference: {
-        get: jest.fn().mockRejectedValue(new Error('Connection refused')),
-      },
-    } as unknown as ElasticsearchClient;
+  it('re-probes after the 5-minute TTL expires', async () => {
+    const logger = createMockLogger();
+    const resolve = createInferenceResolver(logger);
+    const esClient = createMockEsClient({ [EIS_ID]: 'ok' });
 
-    const result = await checkInferenceAvailability(esClient, '.elser-2-elasticsearch');
-    expect(result).toBe(false);
+    await resolve(esClient);
+    expect(esClient.inference.inference).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(5 * 60 * 1000 + 1);
+
+    await resolve(esClient);
+    expect(esClient.inference.inference).toHaveBeenCalledTimes(2);
+  });
+
+  it('caches negative results to avoid hammering endpoints', async () => {
+    const logger = createMockLogger();
+    const resolve = createInferenceResolver(logger);
+    const esClient = createMockEsClient({ [EIS_ID]: 'fail', [SELF_MANAGED_ID]: 'fail' });
+
+    const first = await resolve(esClient);
+    expect(first.available).toBe(false);
+    expect(esClient.inference.inference).toHaveBeenCalledTimes(2);
+
+    const second = await resolve(esClient);
+    expect(second.available).toBe(false);
+    expect(esClient.inference.inference).toHaveBeenCalledTimes(2);
+  });
+
+  it('works without a logger', async () => {
+    const logger = createMockLogger();
+    const resolve = createInferenceResolver(logger);
+    const esClient = createMockEsClient({ [EIS_ID]: 'ok' });
+
+    const result = await resolve(esClient);
+    expect(result).toEqual({ inferenceId: EIS_ID, available: true });
+  });
+
+  it('reflects a change in availability after cache expires', async () => {
+    const logger = createMockLogger();
+    const resolve = createInferenceResolver(logger);
+    const esClient = createMockEsClient({ [EIS_ID]: 'fail', [SELF_MANAGED_ID]: 'fail' });
+
+    const first = await resolve(esClient);
+    expect(first.available).toBe(false);
+
+    (esClient.inference.inference as jest.Mock).mockImplementation(
+      ({ inference_id: id }: { inference_id: string }) => {
+        if (id === EIS_ID) return Promise.resolve({ inference_results: [] });
+        return Promise.reject(new Error('not available'));
+      }
+    );
+
+    jest.advanceTimersByTime(5 * 60 * 1000 + 1);
+
+    const second = await resolve(esClient);
+    expect(second).toEqual({ inferenceId: EIS_ID, available: true });
+  });
+
+  it('isolates cache between separate resolver instances', async () => {
+    const logger = createMockLogger();
+    const resolverA = createInferenceResolver(logger);
+    const resolverB = createInferenceResolver(logger);
+    const esClient = createMockEsClient({ [EIS_ID]: 'ok' });
+
+    await resolverA(esClient);
+    await resolverB(esClient);
+
+    expect(esClient.inference.inference).toHaveBeenCalledTimes(2);
   });
 });

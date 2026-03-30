@@ -27,13 +27,17 @@ import {
 import { getQueryStorageSettings } from '../storage_settings';
 import { QueryClient, type StoredQueryLink } from './query_client';
 import { computeRuleId, buildEsqlQueryFromKql } from './helpers/query';
-import { checkInferenceAvailability, getElserInferenceId } from './helpers/inference_availability';
+import { createInferenceResolver, type InferenceResolver } from './helpers/inference_availability';
 
 export class QueryService {
+  private readonly resolveInference: InferenceResolver;
+
   constructor(
     private readonly coreSetup: CoreSetup<StreamsPluginStartDependencies>,
     private readonly logger: Logger
-  ) {}
+  ) {
+    this.resolveInference = createInferenceResolver(logger);
+  }
 
   async getClient({
     soClient,
@@ -49,18 +53,12 @@ export class QueryService {
       (await uiSettings.get(OBSERVABILITY_STREAMS_ENABLE_SIGNIFICANT_EVENTS)) ?? false;
 
     const esClient = core.elasticsearch.client.asInternalUser;
-    const isServerless = core.elasticsearch.getCapabilities().serverless;
-    const inferenceEndpointId = getElserInferenceId(isServerless);
-    const inferenceAvailable = await checkInferenceAvailability(
-      esClient,
-      inferenceEndpointId,
-      this.logger
-    );
+    const { inferenceId, available: inferenceAvailable } = await this.resolveInference(esClient);
 
     // The semantic_text field is always declared in the mapping regardless of
     // inference availability — ES does not validate the inference_id at mapping
     // time, so this is safe even when ML is disabled or ELSER is not deployed.
-    const settings = getQueryStorageSettings(inferenceEndpointId);
+    const settings = getQueryStorageSettings(inferenceId);
 
     const adapter = new StorageIndexAdapter<IndexStorageSettings, StoredQueryLink>(
       esClient,

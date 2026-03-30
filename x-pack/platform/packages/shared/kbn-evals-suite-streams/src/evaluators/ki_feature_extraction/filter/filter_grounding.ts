@@ -66,14 +66,19 @@ export const filterGroundingEvaluator = {
         : {})
     );
 
-    const perEntityDetails: Array<{ id: string; entityScore: number; issues: string[] }> = [];
+    const perEntityDetails: Array<{ id: string; entityScore: number; issues: string[]; filter: Condition }> = [];
 
     for (const entity of entities) {
       const condition = entity.filter as Condition;
       const eqPairs = extractEqPairs(condition);
 
       if (eqPairs.length === 0) {
-        perEntityDetails.push({ id: entity.id, entityScore: 1, issues: [] });
+        perEntityDetails.push({
+          id: entity.id,
+          entityScore: 0,
+          issues: ['filter contains no eq conditions — cannot verify grounding'],
+          filter: condition,
+        });
         continue;
       }
 
@@ -85,12 +90,12 @@ export const filterGroundingEvaluator = {
           return docValue !== undefined && String(docValue) === valueStr;
         });
         if (!grounded) {
-          ungroundedPairs.push(`${field}=${valueStr}`);
+          ungroundedPairs.push(`${field}=${valueStr} was not found in the input documents`);
         }
       }
 
       const groundedRatio = (eqPairs.length - ungroundedPairs.length) / eqPairs.length;
-      perEntityDetails.push({ id: entity.id, entityScore: groundedRatio, issues: ungroundedPairs });
+      perEntityDetails.push({ id: entity.id, entityScore: groundedRatio, issues: ungroundedPairs, filter: condition });
     }
 
     const score =

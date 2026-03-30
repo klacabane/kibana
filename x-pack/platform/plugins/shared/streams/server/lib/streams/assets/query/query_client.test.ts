@@ -6,6 +6,7 @@
  */
 
 import type { Logger, SavedObjectsClientContract } from '@kbn/core/server';
+import { loggerMock } from '@kbn/logging-mocks';
 import type { RulesClient } from '@kbn/alerting-plugin/server';
 import type { IStorageClient } from '@kbn/storage-adapter';
 import type { StreamQuery, Streams } from '@kbn/streams-schema';
@@ -32,14 +33,7 @@ import { buildSearchEmbeddingText, QueryClient, type StoredQueryLink } from './q
 
 // ==================== Helpers ====================
 
-type MockLogger = Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>;
-
-const createMockLogger = (): jest.Mocked<MockLogger> => ({
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-});
+const createMockLogger = () => loggerMock.create();
 
 const createMockStorageClient = () => ({
   search: jest.fn().mockResolvedValue({ hits: { hits: [] } }),
@@ -60,7 +54,7 @@ const createQueryClient = ({
   inferenceAvailable = false,
 }: {
   storageClient?: ReturnType<typeof createMockStorageClient>;
-  logger?: jest.Mocked<MockLogger>;
+  logger?: ReturnType<typeof createMockLogger>;
   inferenceAvailable?: boolean;
 } = {}) => {
   const client = new QueryClient(

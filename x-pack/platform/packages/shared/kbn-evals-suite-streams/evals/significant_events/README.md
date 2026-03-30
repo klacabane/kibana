@@ -10,6 +10,7 @@ For general information about writing evaluation tests, configuration, and usage
 | Suite | Spec | What it measures |
 | --- | --- | --- |
 | **KI feature extraction** | `ki_feature_extraction/ki_feature_extraction.spec.ts` | Can the LLM identify entities, dependencies, and infrastructure from raw log samples? |
+| **KI feature exclusion** | `ki_feature_exclusion/ki_feature_exclusion.spec.ts` | Does the LLM respect exclusion instructions and preserve non-excluded features across follow-up runs? |
 | **KI query generation** | `ki_query_generation/ki_query_generation.spec.ts` | Can the LLM produce valid, hit-producing ES\|QL rules for significant event detection? |
 | **KI feature duplication** | `ki_feature_duplication/ki_feature_duplication.spec.ts` | Are KIs stable and semantically unique across repeated extraction runs? |
 
@@ -146,10 +147,12 @@ node scripts/evals run \
 | Evaluator | Suite | Description |
 | --- | --- | --- |
 | **type_validation** | KI feature extraction | All KI types are valid (`entity`, `infrastructure`, `technology`, `dependency`, `schema`) |
+| **evidence_coverage** | KI feature extraction | Every KI feature includes at least one evidence string |
 | **evidence_grounding** | KI feature extraction | Evidence strings are grounded in input documents; `evidence_doc_ids` reference real docs |
 | **ki_feature_count** | KI feature extraction | KI feature count falls within expected bounds |
-| **confidence_bounds** | KI feature extraction | No KI exceeds the maximum confidence threshold |
 | **type_assertions** | KI feature extraction | Required types are present; forbidden types are absent |
+| **filter_coverage** | KI feature extraction | Every entity feature includes a filter condition (when `expect_entity_filters: true`) |
+| **filter_grounding** | KI feature extraction | Entity filter equality pairs are grounded in input sample documents |
 | **ki_query_generation_code_evaluator** | KI query generation | ES\|QL syntax validity and execution hit rate |
 | **ki_feature_duplication** | KI feature duplication | Structural deduplication |
 
@@ -158,6 +161,8 @@ node scripts/evals run \
 | Evaluator | Suite | Description |
 | --- | --- | --- |
 | **scenario_criteria** | KI feature extraction, KI query generation | Scenario-specific criteria (e.g. "must identify payment service") |
+| **confidence_calibration** | KI feature extraction | Confidence values reflect evidence directness — features with indirect evidence should not claim confidence=100 |
+| **llm_exclude_compliance** | KI feature exclusion | Excluded features don't reappear in follow-up runs; non-excluded features are preserved |
 | **llm_semantic_uniqueness** | KI feature duplication | Semantic deduplication across KIs |
 | **llm_id_consistency** | KI feature duplication | Same KI ID refers to the same concept across runs |
 

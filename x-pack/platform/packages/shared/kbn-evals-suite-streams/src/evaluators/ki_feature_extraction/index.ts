@@ -8,6 +8,7 @@
 import { selectEvaluators } from '@kbn/evals';
 import type { EvaluationCriterion, Evaluator } from '@kbn/evals';
 import { createScenarioCriteriaLlmEvaluator } from '../scenario_criteria/evaluators';
+import { createConfidenceCalibrationEvaluator } from './confidence/confidence_calibration';
 import { typeValidationEvaluator } from './type/type_validation';
 import { typeAssertionsEvaluator } from './type/type_assertions';
 import { evidenceCoverageEvaluator } from './evidence/evidence_coverage';
@@ -15,7 +16,6 @@ import { evidenceGroundingEvaluator } from './evidence/evidence_grounding';
 import { filterCoverageEvaluator } from './filter/filter_coverage';
 import { filterGroundingEvaluator } from './filter/filter_grounding';
 import { kiFeatureCountEvaluator } from './bounds/ki_feature_count';
-import { confidenceBoundsEvaluator } from './bounds/confidence_bounds';
 import type {
   KIFeatureExtractionEvaluationExample,
   KIFeatureExtractionOutput,
@@ -41,7 +41,6 @@ export const createKIFeatureExtractionEvaluators = (scenarioCriteria?: {
     evidenceCoverageEvaluator,
     evidenceGroundingEvaluator,
     kiFeatureCountEvaluator,
-    confidenceBoundsEvaluator,
     typeAssertionsEvaluator,
     filterCoverageEvaluator,
     filterGroundingEvaluator,
@@ -63,5 +62,6 @@ export const createKIFeatureExtractionEvaluators = (scenarioCriteria?: {
       criteria,
       transformOutput: (output) => getFeaturesFromOutput(output),
     }),
+    createConfidenceCalibrationEvaluator({ criteriaFn }),
   ];
 };

@@ -125,6 +125,10 @@ function termsQuery<T extends string>(
   return [{ terms: { [field]: filteredValues } }];
 }
 
+function escapeWildcard(input: string): string {
+  return input.replace(/[\\*?]/g, '\\$&');
+}
+
 function wildcardQuery<T extends string>(
   field: T,
   value: TermQueryFieldValue | undefined,
@@ -138,7 +142,7 @@ function wildcardQuery<T extends string>(
     {
       wildcard: {
         [field]: {
-          value: `*${value}*`,
+          value: `*${escapeWildcard(String(value))}*`,
           case_insensitive: true,
           ...(opts.boost !== undefined && { boost: opts.boost }),
         },
@@ -480,10 +484,13 @@ export class QueryClient {
     try {
       return await this.executeFindQueries(effectiveMode, streamNames, query, filters);
     } catch (error) {
-      if (effectiveMode !== 'keyword') {
+      // Only fall back silently when the mode was auto-resolved (no explicit
+      // searchMode from the caller). If the caller explicitly requested a
+      // non-keyword mode, propagate the error so they know their request failed.
+      if (effectiveMode !== 'keyword' && !searchMode) {
         const { message } = parseError(error);
         this.dependencies.logger.warn(
-          `Semantic search failed, falling back to keyword mode: ${message}`
+          `Search mode "${effectiveMode}" failed, falling back to keyword: ${message}`
         );
         return await this.executeFindQueries('keyword', streamNames, query, filters);
       }
@@ -575,6 +582,8 @@ export class QueryClient {
           retrievers: [
             {
               standard: {
+                // Keyword leg uses empty filter — stream/asset filters are
+                // applied at the RRF level to avoid double-filtering.
                 query: buildKeywordQuery(query, []),
               },
             },
@@ -594,6 +603,8 @@ export class QueryClient {
             },
           },
           rank_window_size: SEARCH_SIZE_LIMIT,
+          // Lower than the ES default (60) to give more weight to top-ranked
+          // results from each retriever, improving precision for small catalogs.
           rank_constant: 20,
         },
       },

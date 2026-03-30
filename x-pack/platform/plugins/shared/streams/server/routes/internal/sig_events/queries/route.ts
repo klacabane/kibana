@@ -195,6 +195,9 @@ const getDiscoveryQueriesRoute = createServerRoute({
   },
 });
 
+// Uses baseRequestParamsSchema (no searchMode) intentionally: the histogram
+// is an aggregate summary, not a list of individual queries. It always uses
+// the default search mode so occurrences reflect the best-available ranking.
 const getDiscoveryQueriesOccurrencesRoute = createServerRoute({
   endpoint: 'GET /internal/streams/_queries/_occurrences',
   params: z.object({

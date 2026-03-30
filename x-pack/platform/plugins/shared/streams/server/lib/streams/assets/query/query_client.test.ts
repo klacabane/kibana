@@ -436,7 +436,7 @@ describe('QueryClient backward compatibility', () => {
       );
     });
 
-    it('falls back to keyword when hybrid search throws an error', async () => {
+    it('falls back to keyword when auto-resolved hybrid search throws an error', async () => {
       const storageClient = createMockStorageClient();
       const logger = createMockLogger();
       storageClient.search
@@ -453,7 +453,17 @@ describe('QueryClient backward compatibility', () => {
       expect(storageClient.search).toHaveBeenCalledTimes(2);
       expect(results).toEqual([]);
       expect(logger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Semantic search failed, falling back to keyword')
+        expect.stringContaining('"hybrid" failed, falling back to keyword')
+      );
+    });
+
+    it('propagates the error when an explicit searchMode fails', async () => {
+      const storageClient = createMockStorageClient();
+      storageClient.search.mockRejectedValue(new Error('inference unavailable'));
+      const { client } = createQueryClient({ storageClient, inferenceAvailable: true });
+
+      await expect(client.findQueries(['logs.test'], 'SSH', undefined, 'semantic')).rejects.toThrow(
+        'inference unavailable'
       );
     });
 

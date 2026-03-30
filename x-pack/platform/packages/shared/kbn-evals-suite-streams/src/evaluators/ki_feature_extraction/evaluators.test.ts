@@ -15,6 +15,9 @@ const evidenceGroundingEvaluator = createKIFeatureExtractionEvaluators().find(
 const kiFeatureCountEvaluator = createKIFeatureExtractionEvaluators().find(
   (evaluator) => evaluator.name === 'ki_feature_count'
 );
+const filterPresenceEvaluator = createKIFeatureExtractionEvaluators().find(
+  (evaluator) => evaluator.name === 'filter_presence'
+);
 
 const createSearchHit = (source: Record<string, unknown>): SearchHit<Record<string, unknown>> => ({
   _index: 'test-index',
@@ -191,6 +194,135 @@ describe('evidence grounding evaluator', () => {
     });
 
     expect(result.score).toBe(1);
+  });
+});
+
+describe('filter_presence evaluator', () => {
+  const makeDoc = (source: Record<string, unknown>) =>
+    createSearchHit(source);
+
+  it('scores 0 for entities missing a filter', async () => {
+    const result = await filterPresenceEvaluator!.evaluate({
+      input: { sample_documents: [makeDoc({ 'service.name': 'frontend' })] },
+      output: {
+        features: [
+          createKI({ id: 'entity-frontend', type: 'entity', description: 'frontend', confidence: 80 }),
+        ],
+      },
+      expected: { criteria: [], expected_ground_truth: '', expect_entity_filters: true },
+      metadata: null,
+    });
+
+    expect(result.score).toBe(0);
+    expect(result.explanation).toContain('no filter');
+  });
+
+  it('scores 1 for a fully grounded eq filter', async () => {
+    const result = await filterPresenceEvaluator!.evaluate({
+      input: { sample_documents: [makeDoc({ 'service.name': 'frontend' })] },
+      output: {
+        features: [
+          createKI({
+            id: 'entity-frontend',
+            type: 'entity',
+            description: 'frontend',
+            confidence: 80,
+            filter: { field: 'service.name', eq: 'frontend' },
+          }),
+        ],
+      },
+      expected: { criteria: [], expected_ground_truth: '', expect_entity_filters: true },
+      metadata: null,
+    });
+
+    expect(result.score).toBe(1);
+    expect(result.explanation).toContain('grounded');
+  });
+
+  it('scores 0.5 for a filter with an ungrounded eq value', async () => {
+    const result = await filterPresenceEvaluator!.evaluate({
+      input: { sample_documents: [makeDoc({ 'service.name': 'frontend' })] },
+      output: {
+        features: [
+          createKI({
+            id: 'entity-checkout',
+            type: 'entity',
+            description: 'checkout',
+            confidence: 80,
+            filter: { field: 'service.name', eq: 'checkout' },
+          }),
+        ],
+      },
+      expected: { criteria: [], expected_ground_truth: '', expect_entity_filters: true },
+      metadata: null,
+    });
+
+    // has filter (0.5) + 0 grounded pairs out of 1 (0.0) = 0.5
+    expect(result.score).toBe(0.5);
+    expect(result.explanation).toContain('service.name=checkout');
+  });
+
+  it('scores 1 for a filter using only non-eq operators (unverifiable)', async () => {
+    const result = await filterPresenceEvaluator!.evaluate({
+      input: { sample_documents: [makeDoc({ 'http.response.status_code': 500 })] },
+      output: {
+        features: [
+          createKI({
+            id: 'entity-errors',
+            type: 'entity',
+            description: 'error responses',
+            confidence: 80,
+            filter: { field: 'http.response.status_code', gte: 500 },
+          }),
+        ],
+      },
+      expected: { criteria: [], expected_ground_truth: '', expect_entity_filters: true },
+      metadata: null,
+    });
+
+    expect(result.score).toBe(1);
+  });
+
+  it('handles AND conditions and partially grounds them', async () => {
+    const result = await filterPresenceEvaluator!.evaluate({
+      input: {
+        sample_documents: [
+          makeDoc({ 'service.name': 'frontend', 'span.kind': 'server' }),
+        ],
+      },
+      output: {
+        features: [
+          createKI({
+            id: 'entity-frontend',
+            type: 'entity',
+            description: 'frontend',
+            confidence: 80,
+            filter: {
+              and: [
+                { field: 'service.name', eq: 'frontend' },   // grounded
+                { field: 'service.name', eq: 'wrong-value' }, // not grounded
+              ],
+            },
+          }),
+        ],
+      },
+      expected: { criteria: [], expected_ground_truth: '', expect_entity_filters: true },
+      metadata: null,
+    });
+
+    // 0.5 + 0.5 * (1/2) = 0.75
+    expect(result.score).toBe(0.75);
+  });
+
+  it('skips evaluation when expect_entity_filters is not set', async () => {
+    const result = await filterPresenceEvaluator!.evaluate({
+      input: { sample_documents: [] },
+      output: { features: [] },
+      expected: { criteria: [], expected_ground_truth: '' },
+      metadata: null,
+    });
+
+    expect(result.score).toBeNull();
   });
 });
 

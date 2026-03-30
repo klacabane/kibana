@@ -11,6 +11,14 @@ import { type BaseFeature } from '@kbn/streams-schema';
 import type { EvaluationCriterion, Evaluator } from '@kbn/evals';
 import type { SearchHit } from '@elastic/elasticsearch/lib/api/types';
 import { flattenObject } from '@kbn/object-utils';
+import {
+  isAndCondition,
+  isOrCondition,
+  isNotCondition,
+  isFilterCondition,
+  type Condition,
+  type StringOrNumberOrBoolean,
+} from '@kbn/streamlang';
 import { createScenarioCriteriaLlmEvaluator } from '../scenario_criteria/evaluators';
 import { isEvidenceGrounded } from './is_evidence_grounded';
 
@@ -364,13 +372,40 @@ const typeAssertionsEvaluator = {
 } satisfies KIFeatureExtractionEvaluator;
 
 /**
- * Checks that entity-type features include a `filter` condition.
+ * Recursively extracts all equality (`eq`) field/value pairs from a condition tree.
+ */
+function extractEqPairs(condition: Condition): Array<{ field: string; value: StringOrNumberOrBoolean }> {
+  if (isAndCondition(condition)) {
+    return condition.and.flatMap(extractEqPairs);
+  }
+  if (isOrCondition(condition)) {
+    return condition.or.flatMap(extractEqPairs);
+  }
+  if (isNotCondition(condition)) {
+    return extractEqPairs(condition.not);
+  }
+  if (isFilterCondition(condition) && 'eq' in condition && Boolean(condition.eq)) {
+    return [{ field: condition.field, value: condition.eq as StringOrNumberOrBoolean }];
+  }
+  return [];
+}
+
+/**
+ * Checks that entity-type features include a `filter` condition and that the
+ * filter's equality pairs are grounded in the input sample documents.
+ *
+ * Scoring per entity:
+ *   - No filter                          → 0
+ *   - Filter present but no eq pairs     → 1 (unverifiable, e.g. range/exists)
+ *   - Filter with eq pairs               → 0.5 + 0.5 * (grounded_pairs / total_pairs)
+ *
+ * Overall score = mean of per-entity scores.
  * Only evaluated when the scenario sets `expect_entity_filters: true`.
  */
 const filterPresenceEvaluator = {
   name: 'filter_presence',
   kind: 'CODE' as const,
-  evaluate: async ({ output, expected }) => {
+  evaluate: async ({ input, output, expected }) => {
     if (!expected.expect_entity_filters) {
       return { score: null, explanation: 'Entity filter evaluation not requested — skipping' };
     }
@@ -383,19 +418,73 @@ const filterPresenceEvaluator = {
       return { score, explanation: 'No entity features' };
     }
 
+    const flatDocs = input.sample_documents.map((hit) =>
+      flattenObject(hit._source != null && typeof hit._source === 'object'
+        ? (hit._source as Record<string, unknown>)
+        : {})
+    );
+
     const [withFilter, withoutFilter] = partition(entities, ({ filter }) => Boolean(filter));
-    const score = withFilter.length / entities.length;
-    const missing = withoutFilter.map((f) => f.id);
+
+    const perEntityDetails: Array<{ id: string; entityScore: number; issues: string[] }> = [];
+
+    for (const entity of withFilter) {
+      const condition = entity.filter as Condition;
+      const eqPairs = extractEqPairs(condition);
+
+      if (eqPairs.length === 0) {
+        // Filter exists but uses only non-eq operators — trust the model, score 1
+        perEntityDetails.push({ id: entity.id, entityScore: 1, issues: [] });
+        continue;
+      }
+
+      const ungroundedPairs: string[] = [];
+      for (const { field, value } of eqPairs) {
+        const valueStr = String(value);
+        const grounded = flatDocs.some((doc) => {
+          const docValue = doc[field];
+          return docValue !== undefined && String(docValue) === valueStr;
+        });
+        if (!grounded) {
+          ungroundedPairs.push(`${field}=${valueStr}`);
+        }
+      }
+
+      const groundedRatio = (eqPairs.length - ungroundedPairs.length) / eqPairs.length;
+      const entityScore = 0.5 + 0.5 * groundedRatio;
+      perEntityDetails.push({ id: entity.id, entityScore, issues: ungroundedPairs });
+    }
+
+    for (const entity of withoutFilter) {
+      perEntityDetails.push({
+        id: entity.id,
+        entityScore: 0,
+        issues: ['no filter'],
+      });
+    }
+
+    const score =
+      perEntityDetails.reduce((sum, { entityScore }) => sum + entityScore, 0) /
+      perEntityDetails.length;
+
+    const issueLines = perEntityDetails
+      .filter(({ issues }) => issues.length > 0)
+      .map(({ id, entityScore, issues }) =>
+        `"${id}" (score=${entityScore.toFixed(2)}): ${issues.join(', ')}`
+      );
 
     return {
       score,
       explanation:
-        missing.length > 0
-          ? `${missing.length}/${entities.length} entity feature(s) missing filter: ${missing.join(
-              ', '
-            )}`
-          : 'All entity features have a filter',
-      details: { totalEntities: entities.length, withFilter: withFilter.length, missing },
+        issueLines.length > 0
+          ? `Filter issues — ${issueLines.join('; ')}`
+          : `All ${entities.length} entity feature(s) have grounded filters`,
+      details: {
+        totalEntities: entities.length,
+        withFilter: withFilter.length,
+        missing: withoutFilter.map((f) => f.id),
+        perEntity: perEntityDetails,
+      },
     };
   },
 } satisfies KIFeatureExtractionEvaluator;

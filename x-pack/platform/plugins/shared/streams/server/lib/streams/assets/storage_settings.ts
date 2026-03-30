@@ -54,6 +54,9 @@ export const getQueryStorageSettings = (inferenceId: string): IndexStorageSettin
   schema: {
     properties: {
       ...queryStorageSettings.schema.properties,
+      // The semantic_text field is always declared in the mapping regardless of
+      // inference availability — ES does not validate the inference_id at mapping
+      // time, so this is safe even when ML is disabled or ELSER is not deployed.
       [QUERY_SEARCH_EMBEDDING]: types.semantic_text({ inference_id: inferenceId }),
     },
   },

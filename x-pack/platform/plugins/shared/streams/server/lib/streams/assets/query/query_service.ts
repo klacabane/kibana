@@ -55,9 +55,6 @@ export class QueryService {
     const esClient = core.elasticsearch.client.asInternalUser;
     const { inferenceId, available: inferenceAvailable } = await this.resolveInference(esClient);
 
-    // The semantic_text field is always declared in the mapping regardless of
-    // inference availability — ES does not validate the inference_id at mapping
-    // time, so this is safe even when ML is disabled or ELSER is not deployed.
     const settings = getQueryStorageSettings(inferenceId);
 
     const adapter = new StorageIndexAdapter<IndexStorageSettings, StoredQueryLink>(

@@ -20,7 +20,7 @@ import {
   type QueryUnlinkRequest,
   type SearchMode,
 } from '../../../../../common/queries';
-import type { EsqlRuleParams } from '../../../rules/esql/types';
+import type { EsqlRuleParams } from '../../../sig_events/rules/esql/types';
 import { AssetNotFoundError } from '../../errors/asset_not_found_error';
 import {
   ASSET_ID,

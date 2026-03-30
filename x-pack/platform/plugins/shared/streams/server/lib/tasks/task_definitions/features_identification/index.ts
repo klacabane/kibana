@@ -471,7 +471,7 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                 );
               } catch (error) {
                 if (isDefinitionNotFoundError(error)) {
-                  taskContext.logger.debug(
+                  taskLogger.debug(
                     () =>
                       `Stream ${streamName} was deleted before features identification task started, skipping`
                   );
@@ -489,14 +489,14 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   errorMessage.includes('ERR_CANCELED') ||
                   errorMessage.includes('Request was aborted')
                 ) {
-                  taskContext.logger.debug(
+                  taskLogger.debug(
                     () => `Task ${runContext.taskInstance.id} was canceled: ${errorMessage}`
                   );
                   trackEmptyTelemetry('canceled');
                   return getDeleteTaskRunResult();
                 }
 
-                taskContext.logger.error(
+                taskLogger.error(
                   `Task ${runContext.taskInstance.id} failed: ${errorMessage}`,
                   { error } as LogMeta
                 );

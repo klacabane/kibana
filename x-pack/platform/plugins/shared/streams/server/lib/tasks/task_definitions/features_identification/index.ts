@@ -496,10 +496,9 @@ export function createStreamsFeaturesIdentificationTask(taskContext: TaskContext
                   return getDeleteTaskRunResult();
                 }
 
-                taskLogger.error(
-                  `Task ${runContext.taskInstance.id} failed: ${errorMessage}`,
-                  { error } as LogMeta
-                );
+                taskLogger.error(`Task ${runContext.taskInstance.id} failed: ${errorMessage}`, {
+                  error,
+                } as LogMeta);
 
                 await taskClient.fail<FeaturesIdentificationTaskParams>(
                   _task,

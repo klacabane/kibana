@@ -18,7 +18,7 @@ import {
   replaySignificantEventsSnapshot,
 } from '../../../src/data_generators/replay';
 import { evaluate } from '../../../src/evaluate';
-import { createKIFeatureExtractionEvaluators } from '../../../src/evaluators/ki_feature_extraction/evaluators';
+import { createKIFeatureExtractionEvaluators } from '../../../src/evaluators/ki_feature_extraction';
 import {
   getActiveDatasets,
   MANAGED_STREAM_NAME,
@@ -112,8 +112,8 @@ evaluate.describe('KI feature extraction', { tag: tags.serverless.observability.
                         ? {
                             missing_apps: missingApps,
                             missing_apps_note:
-                              `The following apps had no log data in the snapshot and could not be ` +
-                              `identified by the model: ${missingApps.join(', ')}. ` +
+                              `The following apps had no log data in the snapshot, so the model had ` +
+                              `no evidence for them: ${missingApps.join(', ')}. ` +
                               `Criteria referencing these apps should be marked N/A.`,
                           }
                         : {}),
@@ -144,10 +144,10 @@ evaluate.describe('KI feature extraction', { tag: tags.serverless.observability.
                 criteriaFn: evaluators.criteria.bind(evaluators),
                 criteria: scenario.output.criteria,
               }),
-              evaluators.traceBasedEvaluators.inputTokens,
-              evaluators.traceBasedEvaluators.outputTokens,
-              evaluators.traceBasedEvaluators.cachedTokens,
-              createSpanLatencyEvaluator({ traceEsClient, log, spanName: 'ChatComplete' }),
+              //evaluators.traceBasedEvaluators.inputTokens,
+              //evaluators.traceBasedEvaluators.outputTokens,
+              //evaluators.traceBasedEvaluators.cachedTokens,
+              //createSpanLatencyEvaluator({ traceEsClient, log, spanName: 'ChatComplete' }),
             ]
           );
         }

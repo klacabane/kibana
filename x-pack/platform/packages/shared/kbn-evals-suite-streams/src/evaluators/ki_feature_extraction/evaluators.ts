@@ -116,9 +116,44 @@ const typeValidationEvaluator = {
 } satisfies KIFeatureExtractionEvaluator;
 
 /**
+ * Measures the fraction of KI features that include at least one evidence string.
+ * Features without evidence indicate the model failed to justify its output.
+ */
+const evidenceCoverageEvaluator = {
+  name: 'evidence_coverage',
+  kind: 'CODE' as const,
+  evaluate: async ({ output }) => {
+    const features = getFeaturesFromOutput(output);
+    if (features.length === 0) {
+      return { score: null, explanation: 'No KI features to evaluate' };
+    }
+
+    const withEvidence = features.filter((f) => (f.evidence ?? []).length > 0);
+    const withoutEvidence = features.filter((f) => (f.evidence ?? []).length === 0);
+    const score = withEvidence.length / features.length;
+
+    return {
+      score,
+      explanation:
+        withoutEvidence.length > 0
+          ? `${withoutEvidence.length}/${features.length} feature(s) lack evidence: ${withoutEvidence.map((f) => `"${f.id}"`).join(', ')}`
+          : `All ${features.length} feature(s) include evidence`,
+      details: {
+        total: features.length,
+        withEvidence: withEvidence.length,
+        withoutEvidence: withoutEvidence.map((f) => f.id),
+      },
+    };
+  },
+} satisfies KIFeatureExtractionEvaluator;
+
+/**
  * Checks that every evidence string in every KI is grounded in the input
  * documents — either as a `field.path=value` snippet matching a document field,
  * or as a direct quote appearing in any string value.
+ *
+ * Only scores features that actually provide evidence (coverage is measured
+ * separately by `evidence_coverage`).
  *
  * When KI features include `evidence_doc_ids`, additionally validates that:
  * 1. All referenced `_id`s exist in the input documents.
@@ -142,7 +177,6 @@ const evidenceGroundingEvaluator = {
         doc._source != null && typeof doc._source === 'object'
           ? (doc._source as Record<string, unknown>)
           : undefined;
-      // flatten the object so we can lookup evidence keys by dotted path
       const resolved = flattenObject(source ?? doc);
       if (id) {
         docsById.set(id, resolved);
@@ -163,10 +197,9 @@ const evidenceGroundingEvaluator = {
     for (const feature of features) {
       const evidenceList = feature.evidence ?? [];
       if (evidenceList.length === 0) {
-        // A feature with no evidence at all is treated as one ungrounded item.
-        totalEvidence++;
-        ungroundedItems.push(`KI feature "${feature.id}": no evidence provided`);
+        continue;
       }
+
       for (const evidence of evidenceList) {
         totalEvidence++;
         if (isEvidenceGrounded(evidence, documents)) {
@@ -206,7 +239,7 @@ const evidenceGroundingEvaluator = {
     }
 
     if (totalEvidence === 0) {
-      return { score: 1, explanation: 'No KI features, no evidence to check' };
+      return { score: null, explanation: 'No evidence strings to check' };
     }
 
     const groundingScore = groundedEvidence / totalEvidence;
@@ -495,6 +528,7 @@ export const createKIFeatureExtractionEvaluators = (scenarioCriteria?: {
 }) => {
   const base = selectEvaluators([
     typeValidationEvaluator,
+    evidenceCoverageEvaluator,
     evidenceGroundingEvaluator,
     kiFeatureCountEvaluator,
     confidenceBoundsEvaluator,

@@ -8,6 +8,7 @@
 import { dateRangeQuery, termQuery, termsQuery } from '@kbn/es-query';
 import type { QueryDslQueryContainer } from '@elastic/elasticsearch/lib/api/types';
 import type { IStorageClient } from '@kbn/storage-adapter';
+import type { Logger } from '@kbn/core/server';
 import type { BaseFeature, Feature } from '@kbn/streams-schema';
 import { isDuplicateFeature, isComputedFeature } from '@kbn/streams-schema';
 import { isNotFoundError } from '@kbn/es-errors';
@@ -31,10 +32,72 @@ import {
   FEATURE_EXCLUDED_AT,
   FEATURE_FILTER,
   FEATURE_EVIDENCE_DOC_IDS,
+  FEATURE_SEARCH_EMBEDDING,
 } from './fields';
 import type { FeatureStorageSettings } from './storage_settings';
 import type { StoredFeature } from './stored_feature';
 import { StatusError } from '../errors/status_error';
+import { parseError } from '../errors/parse_error';
+import type { SearchMode } from '../../../../common/queries';
+
+/**
+ * Minimum raw ELSER score threshold for semantic search results.
+ * See query_client.ts for rationale — same threshold applies here.
+ */
+const SEMANTIC_MIN_SCORE = 10;
+
+const SEARCH_SIZE_LIMIT = 10_000;
+
+function escapeWildcard(input: string): string {
+  return input.replace(/[\\*?]/g, '\\$&');
+}
+
+function wildcardQuery<T extends string>(
+  field: T,
+  value: string | undefined,
+  opts: { boost?: number } = {}
+): QueryDslQueryContainer[] {
+  if (!value) return [];
+  return [
+    {
+      wildcard: {
+        [field]: {
+          value: `*${escapeWildcard(value)}*`,
+          case_insensitive: true,
+          ...(opts.boost !== undefined && { boost: opts.boost }),
+        },
+      },
+    },
+  ];
+}
+
+function buildKeywordQuery(
+  query: string,
+  filter: QueryDslQueryContainer[]
+): QueryDslQueryContainer {
+  return {
+    bool: {
+      filter,
+      should: [
+        ...wildcardQuery(FEATURE_TITLE, query, { boost: 3 }),
+        ...wildcardQuery(FEATURE_DESCRIPTION, query, { boost: 2 }),
+        ...wildcardQuery(FEATURE_SUBTYPE, query),
+      ],
+      minimum_should_match: 1,
+    },
+  };
+}
+
+export function buildSearchEmbeddingText(
+  feature: Pick<BaseFeature, 'title' | 'description'>,
+  streamName?: string
+): string {
+  const parts: string[] = [];
+  if (streamName) parts.push(`Stream: ${streamName}`);
+  if (feature.title) parts.push(`Title: ${feature.title}`);
+  if (feature.description) parts.push(`Description: ${feature.description}`);
+  return parts.join('\n');
+}
 
 interface FeatureBulkIndexOperation {
   index: { feature: Feature };
@@ -61,7 +124,9 @@ export class FeatureClient {
   constructor(
     private readonly clients: {
       storageClient: IStorageClient<FeatureStorageSettings, StoredFeature>;
-    }
+      logger: Logger;
+    },
+    private readonly inferenceAvailable: boolean = false
   ) {}
 
   async clean() {
@@ -80,7 +145,7 @@ export class FeatureClient {
     return await this.clients.storageClient.bulk({
       operations: resolvedOperations.map((operation) => {
         if ('index' in operation) {
-          const document = toStorage(stream, operation.index.feature);
+          const document = toStorage(stream, operation.index.feature, this.inferenceAvailable);
           return {
             index: {
               document,
@@ -220,6 +285,148 @@ export class FeatureClient {
     };
   }
 
+  async findFeatures(
+    streams: string | string[],
+    query: string,
+    searchMode?: SearchMode
+  ): Promise<{ hits: Feature[]; total: number }> {
+    const effectiveMode = this.resolveSearchMode(searchMode);
+
+    try {
+      return await this.executeFindFeatures(effectiveMode, streams, query);
+    } catch (error) {
+      // Only fall back silently when the mode was auto-resolved (no explicit
+      // searchMode from the caller). If the caller explicitly requested a
+      // non-keyword mode, propagate the error so they know their request failed.
+      if (effectiveMode !== 'keyword' && !searchMode) {
+        const { message } = parseError(error);
+        this.clients.logger.warn(
+          `Search mode "${effectiveMode}" failed, falling back to keyword: ${message}`
+        );
+        return await this.executeFindFeatures('keyword', streams, query);
+      }
+      throw error;
+    }
+  }
+
+  private resolveSearchMode(searchMode?: SearchMode): SearchMode {
+    if (searchMode) {
+      if (searchMode !== 'keyword' && !this.inferenceAvailable) {
+        this.clients.logger.debug(
+          `Search mode "${searchMode}" requested but inference is unavailable, falling back to keyword`
+        );
+        return 'keyword';
+      }
+      return searchMode;
+    }
+    return this.inferenceAvailable ? 'hybrid' : 'keyword';
+  }
+
+  private async executeFindFeatures(
+    mode: SearchMode,
+    streams: string | string[],
+    query: string
+  ): Promise<{ hits: Feature[]; total: number }> {
+    const streamNames = Array.isArray(streams) ? streams : [streams];
+    const filter: QueryDslQueryContainer[] = [...termsQuery(STREAM_NAME, streamNames)];
+
+    if (mode === 'keyword') {
+      return this.findFeaturesByKeyword(filter, query);
+    }
+
+    if (mode === 'semantic') {
+      return this.findFeaturesBySemantic(filter, query);
+    }
+
+    return this.findFeaturesByHybrid(filter, query);
+  }
+
+  private async findFeaturesByKeyword(
+    filter: QueryDslQueryContainer[],
+    query: string
+  ): Promise<{ hits: Feature[]; total: number }> {
+    const response = await this.clients.storageClient.search({
+      size: SEARCH_SIZE_LIMIT,
+      track_total_hits: true,
+      query: buildKeywordQuery(query, filter),
+    });
+
+    return {
+      hits: response.hits.hits.map((hit) => fromStorage(hit._source)),
+      total: response.hits.total.value,
+    };
+  }
+
+  private async findFeaturesBySemantic(
+    filter: QueryDslQueryContainer[],
+    query: string
+  ): Promise<{ hits: Feature[]; total: number }> {
+    const response = await this.clients.storageClient.search({
+      size: SEARCH_SIZE_LIMIT,
+      track_total_hits: true,
+      retriever: {
+        standard: {
+          query: {
+            match: { [FEATURE_SEARCH_EMBEDDING]: query },
+          },
+          filter: { bool: { filter } },
+          min_score: SEMANTIC_MIN_SCORE,
+        },
+      },
+    });
+
+    return {
+      hits: response.hits.hits.map((hit) => fromStorage(hit._source)),
+      total: response.hits.total.value,
+    };
+  }
+
+  private async findFeaturesByHybrid(
+    filter: QueryDslQueryContainer[],
+    query: string
+  ): Promise<{ hits: Feature[]; total: number }> {
+    const response = await this.clients.storageClient.search({
+      size: SEARCH_SIZE_LIMIT,
+      track_total_hits: true,
+      retriever: {
+        rrf: {
+          retrievers: [
+            {
+              standard: {
+                // Keyword leg uses empty filter — stream filters are
+                // applied at the RRF level to avoid double-filtering.
+                query: buildKeywordQuery(query, []),
+              },
+            },
+            {
+              standard: {
+                query: {
+                  match: { [FEATURE_SEARCH_EMBEDDING]: query },
+                },
+                // See SEMANTIC_MIN_SCORE for rationale.
+                min_score: SEMANTIC_MIN_SCORE,
+              },
+            },
+          ],
+          filter: {
+            bool: {
+              filter,
+            },
+          },
+          rank_window_size: SEARCH_SIZE_LIMIT,
+          // Lower than the ES default (60) to give more weight to top-ranked
+          // results from each retriever, improving precision for small catalogs.
+          rank_constant: 20,
+        },
+      },
+    });
+
+    return {
+      hits: response.hits.hits.map((hit) => fromStorage(hit._source)),
+      total: response.hits.total.value,
+    };
+  }
+
   private async filterValidOperations(
     stream: string,
     operations: FeatureBulkOperation[]
@@ -311,7 +518,8 @@ export class FeatureClient {
   }
 }
 
-function toStorage(stream: string, feature: Feature): StoredFeature {
+function toStorage(stream: string, feature: Feature, inferenceAvailable: boolean): StoredFeature {
+  const embeddingText = buildSearchEmbeddingText(feature, stream);
   return {
     [FEATURE_UUID]: feature.uuid,
     [FEATURE_ID]: feature.id,
@@ -331,7 +539,10 @@ function toStorage(stream: string, feature: Feature): StoredFeature {
     [FEATURE_EXCLUDED_AT]: feature.excluded_at,
     [FEATURE_TITLE]: feature.title,
     [FEATURE_FILTER]: feature.filter,
-  };
+    ...(inferenceAvailable && embeddingText
+      ? { [FEATURE_SEARCH_EMBEDDING]: embeddingText }
+      : {}),
+  } as StoredFeature;
 }
 
 function fromStorage(feature: StoredFeature): Feature {

@@ -8,6 +8,7 @@
 import { z } from '@kbn/zod/v4';
 import { BooleanFromString } from '@kbn/zod-helpers/v4';
 import type { IdentifyFeaturesResult, TaskResult } from '@kbn/streams-schema';
+import { searchModeSchema } from '../../../utils/search_mode';
 import { baseFeatureSchema, featureSchema, type Feature } from '@kbn/streams-schema';
 import { v4 as uuid } from 'uuid';
 import { createServerRoute } from '../../../create_server_route';
@@ -160,7 +161,15 @@ export const listAllFeaturesRoute = createServerRoute({
       requiredPrivileges: [STREAMS_API_PRIVILEGES.read],
     },
   },
-  handler: async ({ request, getScopedClients, server }): Promise<{ features: Feature[] }> => {
+  params: z.object({
+    query: z
+      .object({
+        query: z.string().optional().describe('Free-text query for semantic/keyword search'),
+        searchMode: searchModeSchema,
+      })
+      .optional(),
+  }),
+  handler: async ({ params, request, getScopedClients, server }): Promise<{ features: Feature[] }> => {
     const { featureClient, licensing, uiSettingsClient, streamsClient } = await getScopedClients({
       request,
     });
@@ -170,7 +179,14 @@ export const listAllFeaturesRoute = createServerRoute({
     const streams = await streamsClient.listStreams();
     const streamNames = streams.map((stream) => stream.name);
 
-    const { hits: features } = await featureClient.getFeatures(streamNames);
+    const { searchQuery, searchMode } = {
+      searchQuery: params?.query?.query,
+      searchMode: params?.query?.searchMode,
+    };
+
+    const { hits: features } = searchQuery
+      ? await featureClient.findFeatures(streamNames, searchQuery, searchMode)
+      : await featureClient.getFeatures(streamNames);
 
     return {
       features,

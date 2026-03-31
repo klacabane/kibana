@@ -53,10 +53,14 @@ const MAX_EXCLUDED_FEATURES_FOR_PROMPT = 10;
 class FeatureAccumulator {
   private readonly byUuid = new Map<string, Feature>();
   private readonly byLowerId = new Map<string, Feature>();
+  private readonly fromStorage = new Set<string>();
 
-  constructor(initialFeatures: Feature[] = []) {
+  constructor(initialFeatures: Feature[] = [], isFromStorage = false) {
     for (const f of initialFeatures) {
       this.add(f);
+      if (isFromStorage) {
+        this.fromStorage.add(f.uuid);
+      }
     }
   }
 
@@ -80,13 +84,30 @@ class FeatureAccumulator {
     );
   }
 
+  isStoredFeature(feature: Feature): boolean {
+    return this.fromStorage.has(feature.uuid);
+  }
+
+  promoteFromStorage(featureUuid: string) {
+    this.fromStorage.delete(featureUuid);
+  }
+
   getAll(): Feature[] {
     return Array.from(this.byUuid.values());
   }
 
+  getDiscovered(): Feature[] {
+    return this.getAll().filter((f) => !this.fromStorage.has(f.uuid));
+  }
+
   getTopByConfidence(limit: number): Feature[] {
     return this.getAll()
-      .sort((a, b) => b.confidence - a.confidence)
+      .sort((a, b) => {
+        const aEntity = a.type === 'entity' ? 0 : 1;
+        const bEntity = b.type === 'entity' ? 0 : 1;
+        if (aEntity !== bEntity) return aEntity - bEntity;
+        return b.confidence - a.confidence;
+      })
       .slice(0, limit);
   }
 
@@ -156,8 +177,7 @@ export async function identifyStreamFeatures({
       properties,
     }));
 
-  const known = new FeatureAccumulator();
-  const existing = new FeatureAccumulator(existingFeatures);
+  const known = new FeatureAccumulator(existingFeatures, true);
 
   let totalTokensUsed: ChatCompletionTokenCount = {
     prompt: 0,
@@ -177,7 +197,7 @@ export async function identifyStreamFeatures({
       index: streamName,
       start,
       end,
-      features: known.getAll().filter(isFeatureWithFilter),
+      features: known.getDiscovered().filter(isFeatureWithFilter),
       logger,
       size: DOCUMENTS_BATCH_SIZE,
     });
@@ -255,7 +275,6 @@ export async function identifyStreamFeatures({
     const { newFeatures, updatedFeatures, codeIgnoredCount } = reconcileFeatures({
       rawFeatures,
       known,
-      existing,
       ignoredFeatures,
       logger,
       excludedFeatures,
@@ -538,14 +557,12 @@ const hasChanged = (updated: BaseFeature, current: Feature): boolean =>
 function reconcileFeatures({
   rawFeatures,
   known,
-  existing,
   ignoredFeatures,
   excludedFeatures,
   logger,
 }: {
   rawFeatures: BaseFeature[];
   known: FeatureAccumulator;
-  existing: FeatureAccumulator;
   ignoredFeatures: IgnoredFeature[];
   excludedFeatures: Feature[];
   logger: Logger;
@@ -579,23 +596,25 @@ function reconcileFeatures({
   });
 
   for (const raw of nonExcludedInferredFeatures) {
-    const thisRunMatch = known.findDuplicate(raw);
+    const match = known.findDuplicate(raw);
 
-    if (thisRunMatch) {
-      // Intra-run: merge evidence/tags accumulated across iterations of this run
-      const merged = mergeFeature(thisRunMatch, raw);
-      if (hasChanged(merged, thisRunMatch)) {
-        updatedFeatures.push({ ...merged, ...metadata, uuid: thisRunMatch.uuid });
+    if (match) {
+      if (known.isStoredFeature(match)) {
+        // Stored-origin: replace rather than merge — prior data may be stale
+        const replaced = { ...raw, ...metadata, uuid: match.uuid };
+        if (hasChanged(replaced, match)) {
+          updatedFeatures.push(replaced);
+        }
+        known.promoteFromStorage(match.uuid);
+      } else {
+        // Intra-run: merge evidence/tags accumulated across iterations of this run
+        const merged = mergeFeature(match, raw);
+        if (hasChanged(merged, match)) {
+          updatedFeatures.push({ ...merged, ...metadata, uuid: match.uuid });
+        }
       }
     } else {
-      // Cross-run: reuse UUID for UI continuity but don't merge — prior data may be stale
-      const existingMatch = existing.findDuplicate(raw);
-
-      if (existingMatch) {
-        newFeatures.push({ ...raw, ...metadata, uuid: existingMatch.uuid });
-      } else {
-        newFeatures.push({ ...raw, ...metadata, uuid: uuid() });
-      }
+      newFeatures.push({ ...raw, ...metadata, uuid: uuid() });
     }
   }
 

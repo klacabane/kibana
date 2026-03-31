@@ -209,8 +209,7 @@ export async function identifyStreamFeatures({
 
     logger.debug(
       () =>
-        `Iteration ${i + 1}/${maxIterations}: processing ${
-          batchResult.documents.length
+        `Iteration ${i + 1}/${maxIterations}: processing ${batchResult.documents.length
         } documents, ${known.length} features known`
     );
 
@@ -278,13 +277,14 @@ export async function identifyStreamFeatures({
       excludedFeatures,
     });
 
-    const changedFeatures = [...newFeatures, ...updatedFeatures];
-
     for (const feature of newFeatures) {
       known.add(feature);
     }
     for (const feature of updatedFeatures) {
       known.update(feature);
+      if (known.isStoredFeature(feature)) {
+        known.promoteFromStorage(feature.uuid);
+      }
     }
 
     const iterationEntry: IterationTelemetry = {
@@ -301,20 +301,19 @@ export async function identifyStreamFeatures({
       filtersCapped: batchResult.filtersCapped,
       hasFilteredDocuments: batchResult.hasFilteredDocuments,
     };
-    await onIterationComplete?.(iterationEntry, changedFeatures);
+    await onIterationComplete?.(iterationEntry, [...newFeatures, ...updatedFeatures]);
 
     logger.debug(
       () =>
         `Iteration ${i + 1}: found ${rawFeatures.length} features ` +
         `(${newFeatures.length} new, ${updatedFeatures.length} updated), ${known.length} total known, ` +
-        `tokens: prompt=${tokensUsed.prompt} completion=${tokensUsed.completion} cached=${
-          tokensUsed.cached ?? 0
+        `tokens: prompt=${tokensUsed.prompt} completion=${tokensUsed.completion} cached=${tokensUsed.cached ?? 0
         }`
     );
   }
 
   return {
-    features: known.getAll(),
+    features: known.getDiscovered(),
     tokensUsed: totalTokensUsed,
   };
 }
@@ -598,14 +597,13 @@ function reconcileFeatures({
 
     if (match) {
       if (known.isStoredFeature(match)) {
-        // Stored-origin: replace rather than merge — prior data may be stale
+        // Stored-origin: replace rather than merge since prior data may be stale
         const replaced = { ...raw, ...metadata, uuid: match.uuid };
         if (hasChanged(replaced, match)) {
           updatedFeatures.push(replaced);
         }
-        known.promoteFromStorage(match.uuid);
       } else {
-        // Intra-run: merge evidence/tags accumulated across iterations of this run
+        // Intra-run: merge properties accumulated across iterations of this run
         const merged = mergeFeature(match, raw);
         if (hasChanged(merged, match)) {
           updatedFeatures.push({ ...merged, ...metadata, uuid: match.uuid });

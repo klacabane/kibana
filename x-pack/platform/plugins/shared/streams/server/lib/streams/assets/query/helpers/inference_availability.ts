@@ -31,7 +31,8 @@ export interface InferenceResolution {
 
 async function probeInference(
   esClient: ElasticsearchClient,
-  inferenceId: string
+  inferenceId: string,
+  logger: Logger
 ): Promise<boolean> {
   try {
     await esClient.inference.inference(
@@ -39,7 +40,8 @@ async function probeInference(
       { requestTimeout: PROBE_REQUEST_TIMEOUT_MS }
     );
     return true;
-  } catch {
+  } catch (error) {
+    logger.debug(`Inference probe failed for "${inferenceId}": ${error}`);
     return false;
   }
 }
@@ -74,7 +76,7 @@ export function createInferenceResolver(logger: Logger): InferenceResolver {
     inflight = (async () => {
       try {
         for (const inferenceId of ELSER_ENDPOINTS) {
-          if (await probeInference(esClient, inferenceId)) {
+          if (await probeInference(esClient, inferenceId, logger)) {
             const result: InferenceResolution = { inferenceId, available: true };
             cached = { result, expiresAt: Date.now() + CACHE_TTL_MS };
             logger.debug(`ELSER inference available via "${inferenceId}"`);

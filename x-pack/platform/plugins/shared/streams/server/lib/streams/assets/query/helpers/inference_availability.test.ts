@@ -64,6 +64,9 @@ describe('createInferenceResolver', () => {
 
     expect(result).toEqual({ inferenceId: SELF_MANAGED_ID, available: true });
     expect(esClient.inference.inference).toHaveBeenCalledTimes(2);
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.stringMatching(/Inference probe failed for ".+elser/)
+    );
     expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining(SELF_MANAGED_ID));
   });
 
@@ -76,6 +79,12 @@ describe('createInferenceResolver', () => {
 
     expect(result).toEqual({ inferenceId: EIS_ID, available: false });
     expect(esClient.inference.inference).toHaveBeenCalledTimes(2);
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.stringContaining(`Inference probe failed for "${EIS_ID}"`)
+    );
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.stringContaining(`Inference probe failed for "${SELF_MANAGED_ID}"`)
+    );
     expect(logger.debug).toHaveBeenCalledWith('No ELSER inference endpoint available');
   });
 
@@ -119,7 +128,7 @@ describe('createInferenceResolver', () => {
     expect(esClient.inference.inference).toHaveBeenCalledTimes(2);
   });
 
-  it('works without a logger', async () => {
+  it('resolves on the first call without prior cache', async () => {
     const logger = createMockLogger();
     const resolve = createInferenceResolver(logger);
     const esClient = createMockEsClient({ [EIS_ID]: 'ok' });

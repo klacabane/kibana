@@ -37,6 +37,13 @@ export class QueryService {
     private readonly logger: Logger
   ) {
     this.resolveInference = createInferenceResolver(logger);
+
+    // Eagerly warm the inference cache so the first getClient() call
+    // (e.g. during a tool-availability check with a tight timeout)
+    // hits the cache instead of blocking on the probe.
+    coreSetup.getStartServices().then(([core]) => {
+      this.resolveInference(core.elasticsearch.client.asInternalUser).catch(() => {});
+    });
   }
 
   async getClient({

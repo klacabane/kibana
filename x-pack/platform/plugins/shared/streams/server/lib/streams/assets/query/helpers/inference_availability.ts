@@ -17,17 +17,25 @@ const ELSER_ENDPOINTS = [
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
+// Short timeout for the probe: we only want to know if the model is
+// already deployed and responsive, not wait for a cold-start allocation.
+const PROBE_TIMEOUT = '10s';
+const PROBE_REQUEST_TIMEOUT_MS = 10_000;
+
 export interface InferenceResolution {
   inferenceId: string;
   available: boolean;
 }
 
-async function probeInference(esClient: ElasticsearchClient, inferenceId: string) {
+async function probeInference(
+  esClient: ElasticsearchClient,
+  inferenceId: string
+): Promise<boolean> {
   try {
-    await esClient.inference.inference({
-      inference_id: inferenceId,
-      input: 'test',
-    });
+    await esClient.inference.inference(
+      { inference_id: inferenceId, input: 'test', timeout: PROBE_TIMEOUT },
+      { requestTimeout: PROBE_REQUEST_TIMEOUT_MS }
+    );
     return true;
   } catch {
     return false;

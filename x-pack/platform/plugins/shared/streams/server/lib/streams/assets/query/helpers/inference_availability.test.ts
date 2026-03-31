@@ -26,6 +26,8 @@ const createMockEsClient = (probeResponses: Record<string, 'ok' | 'fail'>): Elas
   } as unknown as ElasticsearchClient;
 };
 
+const PROBE_TRANSPORT = { requestTimeout: 10_000 };
+
 const createMockLogger = () => loggerMock.create();
 
 describe('createInferenceResolver', () => {
@@ -46,10 +48,10 @@ describe('createInferenceResolver', () => {
 
     expect(result).toEqual({ inferenceId: EIS_ID, available: true });
     expect(esClient.inference.inference).toHaveBeenCalledTimes(1);
-    expect(esClient.inference.inference).toHaveBeenCalledWith({
-      inference_id: EIS_ID,
-      input: 'test',
-    });
+    expect(esClient.inference.inference).toHaveBeenCalledWith(
+      expect.objectContaining({ inference_id: EIS_ID, timeout: '10s' }),
+      PROBE_TRANSPORT
+    );
     expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining(EIS_ID));
   });
 

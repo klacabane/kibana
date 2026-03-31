@@ -41,8 +41,10 @@ export class QueryService {
     // Eagerly warm the inference cache so the first getClient() call
     // (e.g. during a tool-availability check with a tight timeout)
     // hits the cache instead of blocking on the probe.
-    coreSetup.getStartServices().then(([core]) => {
-      this.resolveInference(core.elasticsearch.client.asInternalUser).catch(() => {});
+    void coreSetup.getStartServices().then(([core]) => {
+      this.resolveInference(core.elasticsearch.client.asInternalUser).catch((error) => {
+        this.logger.error('Error warming up inference cache', error);
+      });
     });
   }
 

@@ -55,12 +55,10 @@ class FeatureAccumulator {
   private readonly byLowerId = new Map<string, Feature>();
   private readonly fromStorage = new Set<string>();
 
-  constructor(initialFeatures: Feature[] = [], isFromStorage = false) {
+  constructor(initialFeatures: Feature[] = []) {
     for (const f of initialFeatures) {
       this.add(f);
-      if (isFromStorage) {
-        this.fromStorage.add(f.uuid);
-      }
+      this.fromStorage.add(f.uuid);
     }
   }
 
@@ -177,7 +175,7 @@ export async function identifyStreamFeatures({
       properties,
     }));
 
-  const known = new FeatureAccumulator(existingFeatures, true);
+  const known = new FeatureAccumulator(existingFeatures);
 
   let totalTokensUsed: ChatCompletionTokenCount = {
     prompt: 0,

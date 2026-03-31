@@ -147,6 +147,33 @@ describe('createInferenceResolver', () => {
     expect(second).toEqual({ inferenceId: EIS_ID, available: true });
   });
 
+  it('deduplicates concurrent calls after cache expiry', async () => {
+    const logger = createMockLogger();
+    const resolve = createInferenceResolver(logger);
+
+    let probeResolve: (v: { inference_results: never[] }) => void;
+    const esClient = {
+      inference: {
+        inference: jest.fn(
+          () => new Promise<{ inference_results: never[] }>((r) => (probeResolve = r))
+        ),
+      },
+    } as unknown as ElasticsearchClient;
+
+    const p1 = resolve(esClient);
+    const p2 = resolve(esClient);
+    const p3 = resolve(esClient);
+
+    expect(esClient.inference.inference).toHaveBeenCalledTimes(1);
+
+    probeResolve!({ inference_results: [] });
+
+    const [r1, r2, r3] = await Promise.all([p1, p2, p3]);
+    expect(r1).toEqual({ inferenceId: EIS_ID, available: true });
+    expect(r1).toBe(r2);
+    expect(r2).toBe(r3);
+  });
+
   it('isolates cache between separate resolver instances', async () => {
     const logger = createMockLogger();
     const resolverA = createInferenceResolver(logger);

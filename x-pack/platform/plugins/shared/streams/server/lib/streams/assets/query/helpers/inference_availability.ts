@@ -50,24 +50,37 @@ export type InferenceResolver = (esClient: ElasticsearchClient) => Promise<Infer
  */
 export function createInferenceResolver(logger: Logger): InferenceResolver {
   let cached: { result: InferenceResolution; expiresAt: number } | null = null;
+  let inflight: Promise<InferenceResolution> | null = null;
 
-  return async (esClient) => {
+  return (esClient) => {
     if (cached && Date.now() < cached.expiresAt) {
-      return cached.result;
+      return Promise.resolve(cached.result);
     }
 
-    for (const inferenceId of ELSER_ENDPOINTS) {
-      if (await probeInference(esClient, inferenceId)) {
-        const result: InferenceResolution = { inferenceId, available: true };
+    if (inflight) {
+      return inflight;
+    }
+
+    inflight = (async () => {
+      try {
+        for (const inferenceId of ELSER_ENDPOINTS) {
+          if (await probeInference(esClient, inferenceId)) {
+            const result: InferenceResolution = { inferenceId, available: true };
+            cached = { result, expiresAt: Date.now() + CACHE_TTL_MS };
+            logger.debug(`ELSER inference available via "${inferenceId}"`);
+            return result;
+          }
+        }
+
+        const result: InferenceResolution = { inferenceId: ELSER_ENDPOINTS[0], available: false };
         cached = { result, expiresAt: Date.now() + CACHE_TTL_MS };
-        logger.debug(`ELSER inference available via "${inferenceId}"`);
+        logger.debug('No ELSER inference endpoint available');
         return result;
+      } finally {
+        inflight = null;
       }
-    }
+    })();
 
-    const result: InferenceResolution = { inferenceId: ELSER_ENDPOINTS[0], available: false };
-    cached = { result, expiresAt: Date.now() + CACHE_TTL_MS };
-    logger.debug('No ELSER inference endpoint available');
-    return result;
+    return inflight;
   };
 }

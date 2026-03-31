@@ -19,8 +19,10 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 
 // Short timeout for the probe: we only want to know if the model is
 // already deployed and responsive, not wait for a cold-start allocation.
-const PROBE_TIMEOUT = '10s';
-const PROBE_REQUEST_TIMEOUT_MS = 10_000;
+// The ES-level timeout prevents waiting for lazy model deployment, and the
+// client-level requestTimeout is a safety net in case ES doesn't respond.
+const PROBE_TIMEOUT = '3s';
+const PROBE_REQUEST_TIMEOUT_MS = 5_000;
 
 export interface InferenceResolution {
   inferenceId: string;

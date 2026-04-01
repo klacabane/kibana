@@ -37,6 +37,7 @@ export class QueryService {
   ) {}
 
   async getClient({
+    esClient,
     soClient,
     rulesClient,
   }: {
@@ -50,7 +51,6 @@ export class QueryService {
     const isSignificantEventsEnabled =
       (await uiSettings.get(OBSERVABILITY_STREAMS_ENABLE_SIGNIFICANT_EVENTS)) ?? false;
 
-    const esClient = core.elasticsearch.client.asInternalUser;
     const { inferenceId, available: inferenceAvailable } = await this.resolveInference(esClient);
 
     const settings = getQueryStorageSettings(inferenceId);

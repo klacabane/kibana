@@ -185,7 +185,7 @@ export const listAllFeaturesRoute = createServerRoute({
     };
 
     const { hits: features } = searchQuery
-      ? await featureClient.findFeatures(streamNames, searchQuery, searchMode)
+      ? await featureClient.findFeatures(streamNames, searchQuery, { searchMode })
       : await featureClient.getFeatures(streamNames);
 
     return {

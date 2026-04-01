@@ -89,13 +89,15 @@ function buildKeywordQuery(
 }
 
 export function buildSearchEmbeddingText(
-  feature: Pick<BaseFeature, 'title' | 'description'>,
+  feature: BaseFeature,
   streamName?: string
 ): string {
   const parts: string[] = [];
   if (streamName) parts.push(`Stream: ${streamName}`);
   if (feature.title) parts.push(`Title: ${feature.title}`);
   if (feature.description) parts.push(`Description: ${feature.description}`);
+  if (feature.type) parts.push(`Type: ${feature.type}`);
+  if (feature.subtype) parts.push(`Subtype: ${feature.subtype}`);
   return parts.join('\n');
 }
 
@@ -127,7 +129,7 @@ export class FeatureClient {
       logger: Logger;
     },
     private readonly inferenceAvailable: boolean = false
-  ) {}
+  ) { }
 
   async clean() {
     await this.clients.storageClient.clean();
@@ -288,22 +290,25 @@ export class FeatureClient {
   async findFeatures(
     streams: string | string[],
     query: string,
-    searchMode?: SearchMode
+    options?: {
+      searchMode?: SearchMode;
+      limit?: number;
+    }
   ): Promise<{ hits: Feature[]; total: number }> {
-    const effectiveMode = this.resolveSearchMode(searchMode);
+    const effectiveMode = this.resolveSearchMode(options?.searchMode);
 
     try {
-      return await this.executeFindFeatures(effectiveMode, streams, query);
+      return await this.executeFindFeatures(effectiveMode, streams, query, options?.limit);
     } catch (error) {
       // Only fall back silently when the mode was auto-resolved (no explicit
       // searchMode from the caller). If the caller explicitly requested a
       // non-keyword mode, propagate the error so they know their request failed.
-      if (effectiveMode !== 'keyword' && !searchMode) {
+      if (effectiveMode !== 'keyword' && !options?.searchMode) {
         const { message } = parseError(error);
         this.clients.logger.warn(
           `Search mode "${effectiveMode}" failed, falling back to keyword: ${message}`
         );
-        return await this.executeFindFeatures('keyword', streams, query);
+        return await this.executeFindFeatures('keyword', streams, query, options?.limit);
       }
       throw error;
     }
@@ -325,28 +330,30 @@ export class FeatureClient {
   private async executeFindFeatures(
     mode: SearchMode,
     streams: string | string[],
-    query: string
+    query: string,
+    limit?: number
   ): Promise<{ hits: Feature[]; total: number }> {
     const streamNames = Array.isArray(streams) ? streams : [streams];
     const filter: QueryDslQueryContainer[] = [...termsQuery(STREAM_NAME, streamNames)];
 
     if (mode === 'keyword') {
-      return this.findFeaturesByKeyword(filter, query);
+      return this.findFeaturesByKeyword(filter, query, limit);
     }
 
     if (mode === 'semantic') {
-      return this.findFeaturesBySemantic(filter, query);
+      return this.findFeaturesBySemantic(filter, query, limit);
     }
 
-    return this.findFeaturesByHybrid(filter, query);
+    return this.findFeaturesByHybrid(filter, query, limit);
   }
 
   private async findFeaturesByKeyword(
     filter: QueryDslQueryContainer[],
-    query: string
+    query: string,
+    limit?: number
   ): Promise<{ hits: Feature[]; total: number }> {
     const response = await this.clients.storageClient.search({
-      size: SEARCH_SIZE_LIMIT,
+      size: limit ?? SEARCH_SIZE_LIMIT,
       track_total_hits: true,
       query: buildKeywordQuery(query, filter),
     });
@@ -359,10 +366,11 @@ export class FeatureClient {
 
   private async findFeaturesBySemantic(
     filter: QueryDslQueryContainer[],
-    query: string
+    query: string,
+    limit?: number
   ): Promise<{ hits: Feature[]; total: number }> {
     const response = await this.clients.storageClient.search({
-      size: SEARCH_SIZE_LIMIT,
+      size: limit ?? SEARCH_SIZE_LIMIT,
       track_total_hits: true,
       retriever: {
         standard: {
@@ -383,10 +391,11 @@ export class FeatureClient {
 
   private async findFeaturesByHybrid(
     filter: QueryDslQueryContainer[],
-    query: string
+    query: string,
+    limit?: number
   ): Promise<{ hits: Feature[]; total: number }> {
     const response = await this.clients.storageClient.search({
-      size: SEARCH_SIZE_LIMIT,
+      size: limit ?? SEARCH_SIZE_LIMIT,
       track_total_hits: true,
       retriever: {
         rrf: {
@@ -413,7 +422,7 @@ export class FeatureClient {
               filter,
             },
           },
-          rank_window_size: SEARCH_SIZE_LIMIT,
+          rank_window_size: limit ?? SEARCH_SIZE_LIMIT,
           // Lower than the ES default (60) to give more weight to top-ranked
           // results from each retriever, improving precision for small catalogs.
           rank_constant: 20,
@@ -448,16 +457,16 @@ export class FeatureClient {
     const validHits =
       idsToValidate.length > 0
         ? (
-            await this.clients.storageClient.search({
-              size: idsToValidate.length,
-              track_total_hits: false,
-              query: {
-                bool: {
-                  filter: [{ terms: { _id: idsToValidate } }, ...termQuery(STREAM_NAME, stream)],
-                },
+          await this.clients.storageClient.search({
+            size: idsToValidate.length,
+            track_total_hits: false,
+            query: {
+              bool: {
+                filter: [{ terms: { _id: idsToValidate } }, ...termQuery(STREAM_NAME, stream)],
               },
-            })
-          ).hits.hits
+            },
+          })
+        ).hits.hits
         : [];
 
     const now = new Date().toISOString();

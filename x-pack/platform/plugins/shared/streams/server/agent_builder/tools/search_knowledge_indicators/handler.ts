@@ -39,11 +39,11 @@ export async function searchKnowledgeIndicatorsToolHandler({
       const streams = await streamsClient.listStreams();
       return streams.map((stream) => stream.name);
     },
-    getFeatures: async (streamName, { limit }) => {
+    getFeatures: async (streamName, { searchText, limit }) => {
       // TODO: add support for semantic search to consume the search_text parameter
-      const result = await featureClient.getFeatures(streamName, {
-        limit,
-      });
+      const result = searchText ?
+        await featureClient.findFeatures(streamName, searchText, { limit })
+        : await featureClient.getFeatures(streamName, { limit, });
       return result.hits;
     },
     getQueries: async (streamNames, search_text) => {

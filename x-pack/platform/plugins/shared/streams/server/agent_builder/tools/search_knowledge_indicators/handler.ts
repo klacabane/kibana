@@ -40,9 +40,13 @@ export async function searchKnowledgeIndicatorsToolHandler({
       return streams.map((stream) => stream.name);
     },
     getFeatures: async (streamName, { searchText, limit }) => {
+      console.log("streamName", streamName);
+      console.log("getFeatures.searchText", searchText);
+      console.log("getFeatures.limit", limit);
       const result = searchText
         ? await featureClient.findFeatures(streamName, searchText, { limit })
         : await featureClient.getFeatures(streamName, { limit });
+      console.log("RESULTS", JSON.stringify(result.hits, null, 2));
       return result.hits;
     },
     getQueries: async (streamNames, search_text) => {

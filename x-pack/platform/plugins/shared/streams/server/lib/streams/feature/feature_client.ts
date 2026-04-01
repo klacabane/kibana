@@ -72,7 +72,7 @@ function wildcardQuery<T extends string>(
 }
 
 function tagsQuery(field: string, query: string): QueryDslQueryContainer[] {
-  const tokens = query.split(/\s+/).filter(Boolean);
+  const tokens = query.split(/\s+/).filter(value => value.length > 3);
   if (tokens.length === 0) return [];
 
   return tokens.map((token) => ({

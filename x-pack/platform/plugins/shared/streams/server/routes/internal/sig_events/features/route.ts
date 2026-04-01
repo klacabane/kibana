@@ -8,9 +8,9 @@
 import { z } from '@kbn/zod/v4';
 import { BooleanFromString } from '@kbn/zod-helpers/v4';
 import type { IdentifyFeaturesResult, TaskResult } from '@kbn/streams-schema';
-import { searchModeSchema } from '../../../utils/search_mode';
 import { baseFeatureSchema, featureSchema, type Feature } from '@kbn/streams-schema';
 import { v4 as uuid } from 'uuid';
+import { searchModeSchema } from '../../../utils/search_mode';
 import { createServerRoute } from '../../../create_server_route';
 import { assertSignificantEventsAccess } from '../../../utils/assert_significant_events_access';
 import { STREAMS_API_PRIVILEGES } from '../../../../../common/constants';
@@ -139,7 +139,11 @@ export const listFeaturesRoute = createServerRoute({
     await assertSignificantEventsAccess({ server, licensing, uiSettingsClient });
     await streamsClient.ensureStream(params.path.name);
 
-    const { query, search_mode: searchMode, include_excluded: includeExcluded } = params.query ?? {};
+    const {
+      query,
+      search_mode: searchMode,
+      include_excluded: includeExcluded,
+    } = params.query ?? {};
     const { hits: features } = query
       ? await featureClient.findFeatures(params.path.name, query, { searchMode })
       : await featureClient.getFeatures(params.path.name, { includeExcluded });
@@ -168,7 +172,12 @@ export const listAllFeaturesRoute = createServerRoute({
       })
       .optional(),
   }),
-  handler: async ({ params, request, getScopedClients, server }): Promise<{ features: Feature[] }> => {
+  handler: async ({
+    params,
+    request,
+    getScopedClients,
+    server,
+  }): Promise<{ features: Feature[] }> => {
     const { featureClient, licensing, uiSettingsClient, streamsClient } = await getScopedClients({
       request,
     });
@@ -178,7 +187,7 @@ export const listAllFeaturesRoute = createServerRoute({
     const streams = await streamsClient.listStreams();
     const streamNames = streams.map((stream) => stream.name);
 
-    const { query, search_mode: searchMode } = params?.query ?? {}
+    const { query, search_mode: searchMode } = params?.query ?? {};
     const { hits: features } = query
       ? await featureClient.findFeatures(streamNames, query, { searchMode })
       : await featureClient.getFeatures(streamNames);

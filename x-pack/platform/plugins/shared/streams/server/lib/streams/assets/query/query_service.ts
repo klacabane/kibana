@@ -5,7 +5,12 @@
  * 2.0.
  */
 
-import type { CoreSetup, ElasticsearchClient, Logger, SavedObjectsClientContract } from '@kbn/core/server';
+import type {
+  CoreSetup,
+  ElasticsearchClient,
+  Logger,
+  SavedObjectsClientContract,
+} from '@kbn/core/server';
 import { OBSERVABILITY_STREAMS_ENABLE_SIGNIFICANT_EVENTS } from '@kbn/management-settings-ids';
 import type { IndexStorageSettings } from '@kbn/storage-adapter';
 import { StorageIndexAdapter } from '@kbn/storage-adapter';

@@ -72,7 +72,7 @@ function wildcardQuery<T extends string>(
 }
 
 function tagsQuery(field: string, query: string): QueryDslQueryContainer[] {
-  const tokens = query.split(/\s+/).filter(value => value.length > 3);
+  const tokens = query.split(/\s+/).filter((value) => value.length > 3);
   if (tokens.length === 0) return [];
 
   return tokens.map((token) => ({
@@ -99,10 +99,7 @@ function buildKeywordQuery(
   };
 }
 
-export function buildSearchEmbeddingText(
-  feature: BaseFeature,
-  streamName?: string
-): string {
+export function buildSearchEmbeddingText(feature: BaseFeature, streamName?: string): string {
   const parts: string[] = [];
   if (streamName) parts.push(`Stream: ${streamName}`);
   if (feature.title) parts.push(`Title: ${feature.title}`);
@@ -141,7 +138,7 @@ export class FeatureClient {
       logger: Logger;
     },
     private readonly inferenceAvailable: boolean = false
-  ) { }
+  ) {}
 
   async clean() {
     await this.clients.storageClient.clean();
@@ -469,16 +466,16 @@ export class FeatureClient {
     const validHits =
       idsToValidate.length > 0
         ? (
-          await this.clients.storageClient.search({
-            size: idsToValidate.length,
-            track_total_hits: false,
-            query: {
-              bool: {
-                filter: [{ terms: { _id: idsToValidate } }, ...termQuery(STREAM_NAME, stream)],
+            await this.clients.storageClient.search({
+              size: idsToValidate.length,
+              track_total_hits: false,
+              query: {
+                bool: {
+                  filter: [{ terms: { _id: idsToValidate } }, ...termQuery(STREAM_NAME, stream)],
+                },
               },
-            },
-          })
-        ).hits.hits
+            })
+          ).hits.hits
         : [];
 
     const now = new Date().toISOString();
@@ -560,9 +557,7 @@ function toStorage(stream: string, feature: Feature, inferenceAvailable: boolean
     [FEATURE_EXCLUDED_AT]: feature.excluded_at,
     [FEATURE_TITLE]: feature.title,
     [FEATURE_FILTER]: feature.filter,
-    ...(inferenceAvailable && embeddingText
-      ? { [FEATURE_SEARCH_EMBEDDING]: embeddingText }
-      : {}),
+    ...(inferenceAvailable && embeddingText ? { [FEATURE_SEARCH_EMBEDDING]: embeddingText } : {}),
   } as StoredFeature;
 }
 

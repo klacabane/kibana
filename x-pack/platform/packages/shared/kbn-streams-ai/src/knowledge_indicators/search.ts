@@ -84,10 +84,15 @@ async function fetchFeatureIndicators({
   streamNames: string[];
   limit: number;
   searchText: string | undefined;
-  getFeatures: (streamName: string, options: { searchText?: string, limit?: number }) => Promise<Feature[]>;
+  getFeatures: (
+    streamName: string,
+    options: { searchText?: string; limit?: number }
+  ) => Promise<Feature[]>;
   onFeatureFetchError?: (streamName: string, error: unknown) => void;
 }): Promise<KnowledgeIndicatorFeature[]> {
-  const results = await Promise.allSettled(streamNames.map((name) => getFeatures(name, { searchText, limit })));
+  const results = await Promise.allSettled(
+    streamNames.map((name) => getFeatures(name, { searchText, limit }))
+  );
 
   const indicators: KnowledgeIndicatorFeature[] = [];
   results.forEach((result, index) => {
@@ -127,7 +132,10 @@ export async function searchKnowledgeIndicators({
   params,
 }: {
   getStreamNames(): Promise<string[]>;
-  getFeatures(streamName: string, options: { searchText?: string, limit?: number }): Promise<Feature[]>;
+  getFeatures(
+    streamName: string,
+    options: { searchText?: string; limit?: number }
+  ): Promise<Feature[]>;
   getQueries(streamNames: string[], search_text?: string): Promise<QueryLink[]>;
   onFeatureFetchError?: (streamName: string, error: unknown) => void;
   params: SearchKnowledgeIndicatorsInput;
@@ -146,12 +154,12 @@ export async function searchKnowledgeIndicators({
   // Step 3: Fetch features.
   const features = normalized.includeFeatures
     ? await fetchFeatureIndicators({
-      streamNames,
-      limit: normalized.limit,
-      searchText: normalized.searchText,
-      getFeatures,
-      onFeatureFetchError,
-    })
+        streamNames,
+        limit: normalized.limit,
+        searchText: normalized.searchText,
+        getFeatures,
+        onFeatureFetchError,
+      })
     : [];
 
   // Step 4: Fetch queries.

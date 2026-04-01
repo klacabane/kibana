@@ -27,17 +27,14 @@ import {
 import { getQueryStorageSettings } from '../storage_settings';
 import { QueryClient, type StoredQueryLink } from './query_client';
 import { computeRuleId, buildEsqlQueryFromKql } from './helpers/query';
-import { createInferenceResolver, type InferenceResolver } from './helpers/inference_availability';
+import type { InferenceResolver } from './helpers/inference_availability';
 
 export class QueryService {
-  private readonly resolveInference: InferenceResolver;
-
   constructor(
     private readonly coreSetup: CoreSetup<StreamsPluginStartDependencies>,
+    private readonly resolveInference: InferenceResolver,
     private readonly logger: Logger
   ) {
-    this.resolveInference = createInferenceResolver(logger);
-
     // Eagerly warm the inference cache so the first getClient() call
     // (e.g. during a tool-availability check with a tight timeout)
     // hits the cache instead of blocking on the probe.

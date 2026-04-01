@@ -81,6 +81,7 @@ function buildKeywordQuery(
       should: [
         ...wildcardQuery(FEATURE_TITLE, query, { boost: 3 }),
         ...wildcardQuery(FEATURE_DESCRIPTION, query, { boost: 2 }),
+        ...wildcardQuery(FEATURE_TYPE, query),
         ...wildcardQuery(FEATURE_SUBTYPE, query),
       ],
       minimum_should_match: 1,

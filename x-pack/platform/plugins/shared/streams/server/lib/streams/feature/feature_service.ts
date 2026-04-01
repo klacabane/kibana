@@ -14,20 +14,14 @@ import type { StoredFeature } from './stored_feature';
 import { getFeatureStorageSettings } from './storage_settings';
 import { FEATURE_ID, FEATURE_PROPERTIES, FEATURE_SUBTYPE, FEATURE_UUID } from './fields';
 import { storedFeatureSchema } from './stored_feature';
-import {
-  createInferenceResolver,
-  type InferenceResolver,
-} from '../assets/query/helpers/inference_availability';
+import type { InferenceResolver } from '../assets/query/helpers/inference_availability';
 
 export class FeatureService {
-  private readonly resolveInference: InferenceResolver;
-
   constructor(
     private readonly coreSetup: CoreSetup<StreamsPluginStartDependencies>,
+    private readonly resolveInference: InferenceResolver,
     private readonly logger: Logger
-  ) {
-    this.resolveInference = createInferenceResolver(logger);
-  }
+  ) {}
 
   async getClient(): Promise<FeatureClient> {
     const [coreStart] = await this.coreSetup.getStartServices();

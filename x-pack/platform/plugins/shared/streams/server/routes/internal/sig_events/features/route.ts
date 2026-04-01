@@ -120,7 +120,8 @@ export const listFeaturesRoute = createServerRoute({
     path: z.object({ name: z.string() }),
     query: z.optional(
       z.object({
-        type: z.string().optional(),
+        query: z.string().optional(),
+        search_mode: searchModeSchema.optional(),
         include_excluded: BooleanFromString.optional(),
       })
     ),
@@ -138,14 +139,12 @@ export const listFeaturesRoute = createServerRoute({
     await assertSignificantEventsAccess({ server, licensing, uiSettingsClient });
     await streamsClient.ensureStream(params.path.name);
 
-    const { hits: features } = await featureClient.getFeatures(params.path.name, {
-      type: params.query?.type ? [params.query.type] : [],
-      includeExcluded: params.query?.include_excluded,
-    });
+    const { query, search_mode: searchMode, include_excluded: includeExcluded } = params.query ?? {};
+    const { hits: features } = query
+      ? await featureClient.findFeatures(params.path.name, query, { searchMode })
+      : await featureClient.getFeatures(params.path.name, { includeExcluded });
 
-    return {
-      features,
-    };
+    return { features };
   },
 });
 
@@ -165,7 +164,7 @@ export const listAllFeaturesRoute = createServerRoute({
     query: z
       .object({
         query: z.string().optional().describe('Free-text query for semantic/keyword search'),
-        searchMode: searchModeSchema,
+        search_mode: searchModeSchema.optional(),
       })
       .optional(),
   }),
@@ -179,7 +178,7 @@ export const listAllFeaturesRoute = createServerRoute({
     const streams = await streamsClient.listStreams();
     const streamNames = streams.map((stream) => stream.name);
 
-    const { query, searchMode } = params?.query ?? {}
+    const { query, search_mode: searchMode } = params?.query ?? {}
     const { hits: features } = query
       ? await featureClient.findFeatures(streamNames, query, { searchMode })
       : await featureClient.getFeatures(streamNames);

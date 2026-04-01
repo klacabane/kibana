@@ -51,6 +51,7 @@ export const featureStorageSettings = {
       [FEATURE_EXPIRES_AT]: types.date(),
       [FEATURE_EXCLUDED_AT]: types.date(),
       [FEATURE_FILTER]: types.object({ enabled: false }),
+      [FEATURE_SEARCH_EMBEDDING]: types.semantic_text(),
     },
   },
 } satisfies IndexStorageSettings;

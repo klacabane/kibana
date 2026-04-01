@@ -71,6 +71,15 @@ function wildcardQuery<T extends string>(
   ];
 }
 
+function tagsQuery(field: string, query: string): QueryDslQueryContainer[] {
+  const tokens = query.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return [];
+
+  return tokens.map((token) => ({
+    term: { [field]: { value: token, case_insensitive: true } },
+  }));
+}
+
 function buildKeywordQuery(
   query: string,
   filter: QueryDslQueryContainer[]
@@ -83,6 +92,7 @@ function buildKeywordQuery(
         ...wildcardQuery(FEATURE_DESCRIPTION, query, { boost: 2 }),
         ...wildcardQuery(FEATURE_TYPE, query),
         ...wildcardQuery(FEATURE_SUBTYPE, query),
+        ...tagsQuery(FEATURE_TAGS, query),
       ],
       minimum_should_match: 1,
     },
@@ -99,6 +109,7 @@ export function buildSearchEmbeddingText(
   if (feature.description) parts.push(`Description: ${feature.description}`);
   if (feature.type) parts.push(`Type: ${feature.type}`);
   if (feature.subtype) parts.push(`Subtype: ${feature.subtype}`);
+  if ((feature.tags?.length ?? 0) > 0) parts.push(`Tags: ${feature.tags?.join(', ')}`);
   return parts.join('\n');
 }
 

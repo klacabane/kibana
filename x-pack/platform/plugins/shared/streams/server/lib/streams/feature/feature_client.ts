@@ -343,6 +343,10 @@ export class FeatureClient {
     limit?: number
   ): Promise<{ hits: Feature[]; total: number }> {
     const streamNames = Array.isArray(streams) ? streams : [streams];
+    if (streamNames.length === 0) {
+      return { hits: [], total: 0 };
+    }
+
     const filter: QueryDslQueryContainer[] = [...termsQuery(STREAM_NAME, streamNames)];
 
     if (mode === 'keyword') {

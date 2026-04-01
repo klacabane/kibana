@@ -179,18 +179,12 @@ export const listAllFeaturesRoute = createServerRoute({
     const streams = await streamsClient.listStreams();
     const streamNames = streams.map((stream) => stream.name);
 
-    const { searchQuery, searchMode } = {
-      searchQuery: params?.query?.query,
-      searchMode: params?.query?.searchMode,
-    };
-
-    const { hits: features } = searchQuery
-      ? await featureClient.findFeatures(streamNames, searchQuery, { searchMode })
+    const { query, searchMode } = params?.query ?? {}
+    const { hits: features } = query
+      ? await featureClient.findFeatures(streamNames, query, { searchMode })
       : await featureClient.getFeatures(streamNames);
 
-    return {
-      features,
-    };
+    return { features };
   },
 });
 

@@ -191,7 +191,7 @@ export class FeatureClient {
       logger: Logger;
     },
     private readonly inferenceAvailable: boolean = false
-  ) { }
+  ) {}
 
   async clean() {
     await this.clients.storageClient.clean();
@@ -496,16 +496,16 @@ export class FeatureClient {
     const validHits =
       idsToValidate.length > 0
         ? (
-          await this.clients.storageClient.search({
-            size: idsToValidate.length,
-            track_total_hits: false,
-            query: {
-              bool: {
-                filter: [{ terms: { _id: idsToValidate } }, ...termQuery(STREAM_NAME, stream)],
+            await this.clients.storageClient.search({
+              size: idsToValidate.length,
+              track_total_hits: false,
+              query: {
+                bool: {
+                  filter: [{ terms: { _id: idsToValidate } }, ...termQuery(STREAM_NAME, stream)],
+                },
               },
-            },
-          })
-        ).hits.hits
+            })
+          ).hits.hits
         : [];
 
     const now = new Date().toISOString();

@@ -99,6 +99,59 @@ function buildKeywordQuery(
   };
 }
 
+function buildBaseFilters({
+  includeExpired,
+  includeExcluded,
+  type,
+  minConfidence,
+}: {
+  includeExpired?: boolean;
+  includeExcluded?: boolean;
+  type?: string[];
+  minConfidence?: number;
+}): QueryDslQueryContainer[] {
+  const filters = [];
+
+  if (!includeExpired) {
+    filters.push({
+      bool: {
+        should: [
+          { bool: { must_not: { exists: { field: FEATURE_EXPIRES_AT } } } },
+          ...dateRangeQuery(Date.now(), undefined, FEATURE_EXPIRES_AT),
+        ],
+        minimum_should_match: 1,
+      },
+    });
+  }
+
+  if (!includeExcluded) {
+    filters.push({
+      bool: { must_not: { exists: { field: FEATURE_EXCLUDED_AT } } },
+    });
+  }
+
+  if (type?.length) {
+    filters.push({
+      bool: {
+        should: type.flatMap((t) => termQuery(FEATURE_TYPE, t)),
+        minimum_should_match: 1,
+      },
+    });
+  }
+
+  if (typeof minConfidence === 'number') {
+    filters.push({
+      range: {
+        [FEATURE_CONFIDENCE]: {
+          gte: minConfidence,
+        },
+      },
+    });
+  }
+
+  return filters;
+}
+
 export function buildSearchEmbeddingText(feature: BaseFeature, streamName?: string): string {
   const parts: string[] = [];
   if (streamName) parts.push(`Stream: ${streamName}`);
@@ -138,7 +191,7 @@ export class FeatureClient {
       logger: Logger;
     },
     private readonly inferenceAvailable: boolean = false
-  ) {}
+  ) { }
 
   async clean() {
     await this.clients.storageClient.clean();
@@ -173,14 +226,14 @@ export class FeatureClient {
 
   async getFeatures(
     streams: string | string[],
-    filters?: {
+    options: {
       type?: string[];
       id?: string[];
       minConfidence?: number;
       limit?: number;
       includeExcluded?: boolean;
       includeExpired?: boolean;
-    }
+    } = {}
   ): Promise<{ hits: Feature[]; total: number }> {
     const streamNames = Array.isArray(streams) ? streams : [streams];
     if (streamNames.length === 0) {
@@ -189,48 +242,12 @@ export class FeatureClient {
 
     const filterClauses: QueryDslQueryContainer[] = [
       ...termsQuery(STREAM_NAME, streamNames),
-      ...(filters?.id?.length ? termsQuery(FEATURE_ID, filters.id) : []),
+      ...(options.id?.length ? termsQuery(FEATURE_ID, options.id) : []),
+      ...buildBaseFilters(options),
     ];
 
-    if (!filters?.includeExpired) {
-      filterClauses.push({
-        bool: {
-          should: [
-            { bool: { must_not: { exists: { field: FEATURE_EXPIRES_AT } } } },
-            ...dateRangeQuery(Date.now(), undefined, FEATURE_EXPIRES_AT),
-          ],
-          minimum_should_match: 1,
-        },
-      });
-    }
-
-    if (!filters?.includeExcluded) {
-      filterClauses.push({
-        bool: { must_not: { exists: { field: FEATURE_EXCLUDED_AT } } },
-      });
-    }
-
-    if (filters?.type?.length) {
-      filterClauses.push({
-        bool: {
-          should: filters.type.flatMap((type) => termQuery(FEATURE_TYPE, type)),
-          minimum_should_match: 1,
-        },
-      });
-    }
-
-    if (typeof filters?.minConfidence === 'number') {
-      filterClauses.push({
-        range: {
-          [FEATURE_CONFIDENCE]: {
-            gte: filters.minConfidence,
-          },
-        },
-      });
-    }
-
     const featuresResponse = await this.clients.storageClient.search({
-      size: filters?.limit ?? 10_000,
+      size: options.limit ?? 10_000,
       track_total_hits: true,
       query: {
         bool: {
@@ -301,13 +318,15 @@ export class FeatureClient {
     query: string,
     options?: {
       searchMode?: SearchMode;
+      includeExpired?: boolean;
+      includeExcluded?: boolean;
       limit?: number;
     }
   ): Promise<{ hits: Feature[]; total: number }> {
     const effectiveMode = this.resolveSearchMode(options?.searchMode);
 
     try {
-      return await this.executeFindFeatures(effectiveMode, streams, query, options?.limit);
+      return await this.executeFindFeatures(effectiveMode, streams, query, options);
     } catch (error) {
       // Only fall back silently when the mode was auto-resolved (no explicit
       // searchMode from the caller). If the caller explicitly requested a
@@ -317,7 +336,7 @@ export class FeatureClient {
         this.clients.logger.warn(
           `Search mode "${effectiveMode}" failed, falling back to keyword: ${message}`
         );
-        return await this.executeFindFeatures('keyword', streams, query, options?.limit);
+        return await this.executeFindFeatures('keyword', streams, query, options);
       }
       throw error;
     }
@@ -340,24 +359,31 @@ export class FeatureClient {
     mode: SearchMode,
     streams: string | string[],
     query: string,
-    limit?: number
+    options: {
+      limit?: number;
+      includeExpired?: boolean;
+      includeExcluded?: boolean;
+    } = {}
   ): Promise<{ hits: Feature[]; total: number }> {
     const streamNames = Array.isArray(streams) ? streams : [streams];
     if (streamNames.length === 0) {
       return { hits: [], total: 0 };
     }
 
-    const filter: QueryDslQueryContainer[] = [...termsQuery(STREAM_NAME, streamNames)];
+    const filter: QueryDslQueryContainer[] = [
+      ...termsQuery(STREAM_NAME, streamNames),
+      ...buildBaseFilters(options),
+    ];
 
     if (mode === 'keyword') {
-      return this.findFeaturesByKeyword(filter, query, limit);
+      return this.findFeaturesByKeyword(filter, query, options.limit);
     }
 
     if (mode === 'semantic') {
-      return this.findFeaturesBySemantic(filter, query, limit);
+      return this.findFeaturesBySemantic(filter, query, options.limit);
     }
 
-    return this.findFeaturesByHybrid(filter, query, limit);
+    return this.findFeaturesByHybrid(filter, query, options.limit);
   }
 
   private async findFeaturesByKeyword(
@@ -470,16 +496,16 @@ export class FeatureClient {
     const validHits =
       idsToValidate.length > 0
         ? (
-            await this.clients.storageClient.search({
-              size: idsToValidate.length,
-              track_total_hits: false,
-              query: {
-                bool: {
-                  filter: [{ terms: { _id: idsToValidate } }, ...termQuery(STREAM_NAME, stream)],
-                },
+          await this.clients.storageClient.search({
+            size: idsToValidate.length,
+            track_total_hits: false,
+            query: {
+              bool: {
+                filter: [{ terms: { _id: idsToValidate } }, ...termQuery(STREAM_NAME, stream)],
               },
-            })
-          ).hits.hits
+            },
+          })
+        ).hits.hits
         : [];
 
     const now = new Date().toISOString();

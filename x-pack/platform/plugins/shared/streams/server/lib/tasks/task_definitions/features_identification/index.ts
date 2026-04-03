@@ -601,11 +601,8 @@ function reconcileFeatures({
 
     if (match) {
       if (known.isStoredFeature(match)) {
-        // Stored-origin: replace rather than merge since prior data may be stale
-        const replaced = { ...raw, ...metadata, uuid: match.uuid };
-        if (hasChanged(raw, match)) {
-          updatedFeatures.push(replaced);
-        }
+        // Stored-origin: always update to refresh last_seen / expires_at
+        updatedFeatures.push({ ...raw, ...metadata, uuid: match.uuid });
       } else {
         // Intra-run: merge properties accumulated across iterations of this run
         const merged = mergeFeature(match, raw);

@@ -210,7 +210,8 @@ export async function identifyStreamFeatures({
 
     logger.debug(
       () =>
-        `Iteration ${i + 1}/${maxIterations}: processing ${batchResult.documents.length
+        `Iteration ${i + 1}/${maxIterations}: processing ${
+          batchResult.documents.length
         } documents, ${known.length} features known`
     );
 
@@ -308,7 +309,8 @@ export async function identifyStreamFeatures({
       () =>
         `Iteration ${i + 1}: found ${rawFeatures.length} features ` +
         `(${newFeatures.length} new, ${updatedFeatures.length} updated), ${known.length} total known, ` +
-        `tokens: prompt=${tokensUsed.prompt} completion=${tokensUsed.completion} cached=${tokensUsed.cached ?? 0
+        `tokens: prompt=${tokensUsed.prompt} completion=${tokensUsed.completion} cached=${
+          tokensUsed.cached ?? 0
         }`
     );
   }

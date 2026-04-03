@@ -99,7 +99,7 @@ class FeatureAccumulator {
     return this.getAll().filter((f) => !this.fromStorage.has(f.uuid));
   }
 
-  getTopByConfidence(limit: number): Feature[] {
+  getTopRanked(limit: number): Feature[] {
     return this.getAll()
       .sort((a, b) => {
         const aEntity = a.type === 'entity' ? 0 : 1;
@@ -206,7 +206,7 @@ export async function identifyStreamFeatures({
       break;
     }
 
-    const previousFeatures = known.getTopByConfidence(MAX_PREVIOUSLY_IDENTIFIED_FEATURES);
+    const previousFeatures = known.getTopRanked(MAX_PREVIOUSLY_IDENTIFIED_FEATURES);
 
     logger.debug(
       () =>

@@ -603,7 +603,7 @@ function reconcileFeatures({
       if (known.isStoredFeature(match)) {
         // Stored-origin: replace rather than merge since prior data may be stale
         const replaced = { ...raw, ...metadata, uuid: match.uuid };
-        if (hasChanged(replaced, match)) {
+        if (hasChanged(raw, match)) {
           updatedFeatures.push(replaced);
         }
       } else {

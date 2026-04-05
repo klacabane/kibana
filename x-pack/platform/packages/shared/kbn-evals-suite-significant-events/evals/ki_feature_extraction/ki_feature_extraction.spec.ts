@@ -18,10 +18,11 @@ import {
   replaySignificantEventsSnapshot,
 } from '../../src/data_generators/replay';
 import { evaluate } from '../../src/evaluate';
+import type { KIFeatureExtractionOutput } from '../../src/evaluators/ki_feature_extraction';
 import {
   createKIFeatureExtractionEvaluators,
   getFeaturesFromOutput,
-} from '../../src/evaluators/ki_feature_extraction/evaluators';
+} from '../../src/evaluators/ki_feature_extraction';
 import { createCorrectnessEvaluators } from '../../src/evaluators/correctness/evaluators';
 import {
   getActiveDatasets,
@@ -73,7 +74,7 @@ evaluate.describe('KI feature extraction', { tag: tags.serverless.observability.
         if (!availableSnapshots.has(source.snapshotName)) {
           log.info(
             `Snapshot "${source.snapshotName}" not found in run "${SIGEVENTS_SNAPSHOT_RUN}" ` +
-            `(source: ${source.gcs.bucket}/${source.gcs.basePathPrefix}) - skipping`
+              `(source: ${source.gcs.bucket}/${source.gcs.basePathPrefix}) - skipping`
           );
           evaluate.skip();
           return;
@@ -159,7 +160,7 @@ evaluate.describe('KI feature extraction', { tag: tags.serverless.observability.
                     meta.failure_domain
                   }${meta.failure_mode ? `, failure mode: ${meta.failure_mode}` : ''}`;
                 },
-                extractResponse: (output) => {
+                extractResponse: (output: KIFeatureExtractionOutput) => {
                   const features = getFeaturesFromOutput(output);
                   return features
                     .map(

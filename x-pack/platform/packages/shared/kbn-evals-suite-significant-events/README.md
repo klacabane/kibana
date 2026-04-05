@@ -10,7 +10,6 @@ For general information about writing evaluation tests, configuration, and usage
 | Suite                      | Spec                                                    | What it measures                                                                                      |
 | -------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | **KI feature extraction**  | `ki_feature_extraction/ki_feature_extraction.spec.ts`   | Can the LLM identify entities, dependencies, and infrastructure from raw log samples?                 |
-| **KI feature exclusion**   | `ki_feature_exclusion/ki_feature_exclusion.spec.ts`     | Does the LLM respect exclusion instructions and preserve non-excluded features across follow-up runs? |
 | **KI query generation**    | `ki_query_generation/ki_query_generation.spec.ts`       | Can the LLM produce valid, hit-producing ES\|QL rules for significant event detection?                |
 | **KI feature exclusion**   | `ki_feature_exclusion/ki_feature_exclusion.spec.ts`     | Does the LLM respect excluded features and avoid regenerating them in follow-up runs?                 |
 | **KI feature duplication** | `ki_feature_duplication/ki_feature_duplication.spec.ts` | Are KIs stable and semantically unique across repeated extraction runs?                               |

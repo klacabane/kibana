@@ -5,7 +5,7 @@
  * 2.0.
  */
 
-import { flattenObject } from '@kbn/object-utils';
+import { getFlattenedObject } from '@kbn/std';
 import type { KIFeatureExtractionEvaluator } from '../types';
 import { getFeaturesFromOutput } from '../types';
 import { isEvidenceGrounded } from './is_evidence_grounded';
@@ -28,19 +28,15 @@ export const evidenceGroundingEvaluator = {
   kind: 'CODE' as const,
   evaluate: async ({ input, output }) => {
     const features = getFeaturesFromOutput(output);
-    const rawDocs: Array<Record<string, unknown>> = input.sample_documents.map((hit) => ({
-      _id: hit._id,
-      _source: hit._source,
-    }));
 
     const docsById = new Map<string, Record<string, unknown>>();
-    const documents = rawDocs.map((doc) => {
+    const documents = input.sample_documents.map((doc) => {
       const id = typeof doc._id === 'string' ? doc._id : undefined;
-      const source =
-        doc._source != null && typeof doc._source === 'object'
-          ? (doc._source as Record<string, unknown>)
-          : undefined;
-      const resolved = flattenObject(source ?? doc);
+
+      const resolved = {
+        ...(doc.fields ?? {}),
+        ...getFlattenedObject(doc._source ?? {}),
+      };
       if (id) {
         docsById.set(id, resolved);
       }

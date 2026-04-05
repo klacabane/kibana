@@ -5,7 +5,7 @@
  * 2.0.
  */
 
-import { flattenObject } from '@kbn/object-utils';
+import { getFlattenedObject } from '@kbn/std';
 import {
   isAndCondition,
   isOrCondition,
@@ -20,7 +20,9 @@ import { getFeaturesFromOutput } from '../types';
 /**
  * Recursively extracts all equality (`eq`) field/value pairs from a condition tree.
  */
-function extractEqPairs(condition: Condition): Array<{ field: string; value: StringOrNumberOrBoolean }> {
+function extractEqPairs(
+  condition: Condition
+): Array<{ field: string; value: StringOrNumberOrBoolean }> {
   if (isAndCondition(condition)) {
     return condition.and.flatMap(extractEqPairs);
   }
@@ -60,13 +62,17 @@ export const filterGroundingEvaluator = {
       return { score: null, explanation: 'No entity features with filters to check' };
     }
 
-    const flatDocs = input.sample_documents.map((hit) =>
-      flattenObject(hit._source != null && typeof hit._source === 'object'
-        ? (hit._source as Record<string, unknown>)
-        : {})
-    );
+    const flatDocs = input.sample_documents.map((hit) => ({
+      ...(hit.fields ?? {}),
+      ...getFlattenedObject(hit._source ?? {}),
+    }));
 
-    const perEntityDetails: Array<{ id: string; entityScore: number; issues: string[]; filter: Condition }> = [];
+    const perEntityDetails: Array<{
+      id: string;
+      entityScore: number;
+      issues: string[];
+      filter: Condition;
+    }> = [];
 
     for (const entity of entities) {
       const condition = entity.filter as Condition;
@@ -95,7 +101,12 @@ export const filterGroundingEvaluator = {
       }
 
       const groundedRatio = (eqPairs.length - ungroundedPairs.length) / eqPairs.length;
-      perEntityDetails.push({ id: entity.id, entityScore: groundedRatio, issues: ungroundedPairs, filter: condition });
+      perEntityDetails.push({
+        id: entity.id,
+        entityScore: groundedRatio,
+        issues: ungroundedPairs,
+        filter: condition,
+      });
     }
 
     const score =
@@ -104,8 +115,9 @@ export const filterGroundingEvaluator = {
 
     const issueLines = perEntityDetails
       .filter(({ issues }) => issues.length > 0)
-      .map(({ id, entityScore, issues }) =>
-        `"${id}" (score=${entityScore.toFixed(2)}): ${issues.join(', ')}`
+      .map(
+        ({ id, entityScore, issues }) =>
+          `"${id}" (score=${entityScore.toFixed(2)}): ${issues.join(', ')}`
       );
 
     return {

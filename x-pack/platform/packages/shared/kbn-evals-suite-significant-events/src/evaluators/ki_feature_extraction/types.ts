@@ -28,7 +28,6 @@ export interface KIFeatureExtractionEvaluationExample {
     weight?: number;
     min_features?: number;
     max_features?: number;
-    max_confidence?: number;
     required_types?: ValidKIFeatureType[];
     forbidden_types?: ValidKIFeatureType[];
     expect_entity_filters?: boolean;

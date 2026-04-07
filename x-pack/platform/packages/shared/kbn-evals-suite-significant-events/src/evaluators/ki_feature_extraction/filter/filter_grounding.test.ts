@@ -52,7 +52,7 @@ describe('filter_grounding evaluator', () => {
     expect(result.explanation).toContain('service.name=checkout');
   });
 
-  it('scores 1 for a filter using only non-eq operators (unverifiable)', async () => {
+  it('scores 0 for a filter using only non-eq operators', async () => {
     const result = await filterGroundingEvaluator.evaluate({
       input: { sample_documents: [createSearchHit({ 'http.response.status_code': 500 })] },
       output: {
@@ -70,7 +70,7 @@ describe('filter_grounding evaluator', () => {
       metadata: null,
     });
 
-    expect(result.score).toBe(1);
+    expect(result.score).toBe(0);
   });
 
   it('handles AND conditions and partially grounds them', async () => {

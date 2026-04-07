@@ -36,7 +36,9 @@ export const filterCoverageEvaluator = {
       score,
       explanation:
         withoutFilter.length > 0
-          ? `${withoutFilter.length}/${entities.length} entity feature(s) lack a filter: ${withoutFilter.map((f) => `"${f.id}"`).join(', ')}`
+          ? `${withoutFilter.length}/${
+              entities.length
+            } entity feature(s) lack a filter: ${withoutFilter.map((f) => `"${f.id}"`).join(', ')}`
           : `All ${entities.length} entity feature(s) include a filter`,
       details: {
         totalEntities: entities.length,

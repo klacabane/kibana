@@ -76,9 +76,7 @@ describe('filter_grounding evaluator', () => {
   it('handles AND conditions and partially grounds them', async () => {
     const result = await filterGroundingEvaluator.evaluate({
       input: {
-        sample_documents: [
-          createSearchHit({ 'service.name': 'frontend', 'span.kind': 'server' }),
-        ],
+        sample_documents: [createSearchHit({ 'service.name': 'frontend', 'span.kind': 'server' })],
       },
       output: {
         features: [
@@ -89,7 +87,7 @@ describe('filter_grounding evaluator', () => {
             confidence: 80,
             filter: {
               and: [
-                { field: 'service.name', eq: 'frontend' },   // grounded
+                { field: 'service.name', eq: 'frontend' }, // grounded
                 { field: 'service.name', eq: 'wrong-value' }, // not grounded
               ],
             },
@@ -108,7 +106,12 @@ describe('filter_grounding evaluator', () => {
       input: { sample_documents: [createSearchHit({ 'service.name': 'frontend' })] },
       output: {
         features: [
-          createKI({ id: 'entity-frontend', type: 'entity', description: 'frontend', confidence: 80 }),
+          createKI({
+            id: 'entity-frontend',
+            type: 'entity',
+            description: 'frontend',
+            confidence: 80,
+          }),
         ],
       },
       expected: { criteria: [], expected_ground_truth: '', expect_entity_filters: true },

@@ -29,7 +29,9 @@ export const evidenceCoverageEvaluator = {
       score,
       explanation:
         withoutEvidence.length > 0
-          ? `${withoutEvidence.length}/${features.length} feature(s) lack evidence: ${withoutEvidence.map((f) => `"${f.id}"`).join(', ')}`
+          ? `${withoutEvidence.length}/${
+              features.length
+            } feature(s) lack evidence: ${withoutEvidence.map((f) => `"${f.id}"`).join(', ')}`
           : `All ${features.length} feature(s) include evidence`,
       details: {
         total: features.length,

@@ -16,10 +16,7 @@ import { evidenceGroundingEvaluator } from './evidence/evidence_grounding';
 import { filterCoverageEvaluator } from './filter/filter_coverage';
 import { filterGroundingEvaluator } from './filter/filter_grounding';
 import { kiFeatureCountEvaluator } from './bounds/ki_feature_count';
-import type {
-  KIFeatureExtractionEvaluationExample,
-  KIFeatureExtractionOutput,
-} from './types';
+import type { KIFeatureExtractionEvaluationExample, KIFeatureExtractionOutput } from './types';
 import { getFeaturesFromOutput } from './types';
 
 export type {

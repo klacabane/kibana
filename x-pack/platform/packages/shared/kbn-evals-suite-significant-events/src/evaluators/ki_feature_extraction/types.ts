@@ -55,7 +55,9 @@ export type KIFeatureExtractionEvaluator = Evaluator<
   KIFeatureExtractionOutput
 >;
 
-export const getFeaturesFromOutput = (output: KIFeatureExtractionOutput | undefined): BaseFeature[] => {
+export const getFeaturesFromOutput = (
+  output: KIFeatureExtractionOutput | undefined
+): BaseFeature[] => {
   if (!output) {
     return [];
   }

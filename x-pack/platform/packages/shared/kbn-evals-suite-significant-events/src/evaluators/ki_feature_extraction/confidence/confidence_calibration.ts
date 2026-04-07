@@ -7,10 +7,7 @@
 
 import type { EvaluationCriterion, Evaluator } from '@kbn/evals';
 import { createScenarioCriteriaLlmEvaluator } from '../../scenario_criteria/evaluators';
-import type {
-  KIFeatureExtractionEvaluationExample,
-  KIFeatureExtractionOutput,
-} from '../types';
+import type { KIFeatureExtractionEvaluationExample, KIFeatureExtractionOutput } from '../types';
 import { getFeaturesFromOutput } from '../types';
 
 const CONFIDENCE_CALIBRATION_CRITERIA: EvaluationCriterion[] = [

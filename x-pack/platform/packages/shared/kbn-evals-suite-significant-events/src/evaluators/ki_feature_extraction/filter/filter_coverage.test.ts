@@ -14,7 +14,12 @@ describe('filter_coverage evaluator', () => {
       input: { sample_documents: [createSearchHit({ 'service.name': 'frontend' })] },
       output: {
         features: [
-          createKI({ id: 'entity-frontend', type: 'entity', description: 'frontend', confidence: 80 }),
+          createKI({
+            id: 'entity-frontend',
+            type: 'entity',
+            description: 'frontend',
+            confidence: 80,
+          }),
         ],
       },
       expected: { criteria: [], expected_ground_truth: '', expect_entity_filters: true },

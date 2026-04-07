@@ -84,7 +84,7 @@ export const otelDemoDataset: DatasetConfig = {
           },
         ],
         min_features: 8,
-        max_features: 20,
+        max_features: 16,
         required_types: ['entity'],
         expect_entity_filters: true,
         expected_ground_truth:

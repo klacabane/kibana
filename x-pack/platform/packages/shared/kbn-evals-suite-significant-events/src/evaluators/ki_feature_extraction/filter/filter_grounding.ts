@@ -10,7 +10,9 @@ import {
   isAndCondition,
   isOrCondition,
   isNotCondition,
-  isFilterCondition,
+  isBinaryFilterCondition,
+  getBinaryFilterOperator,
+  getBinaryFilterValue,
   type Condition,
   type StringOrNumberOrBoolean,
 } from '@kbn/streamlang';
@@ -32,8 +34,10 @@ function extractEqPairs(
   if (isNotCondition(condition)) {
     return extractEqPairs(condition.not);
   }
-  if (isFilterCondition(condition) && 'eq' in condition && Boolean(condition.eq)) {
-    return [{ field: condition.field, value: condition.eq as StringOrNumberOrBoolean }];
+  if (isBinaryFilterCondition(condition) && getBinaryFilterOperator(condition) === 'eq') {
+    return [
+      { field: condition.field, value: getBinaryFilterValue(condition) as StringOrNumberOrBoolean },
+    ];
   }
   return [];
 }

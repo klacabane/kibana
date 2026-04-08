@@ -12,8 +12,18 @@ import { getFeaturesFromOutput } from '../types';
 
 const CONFIDENCE_CALIBRATION_CRITERIA: EvaluationCriterion[] = [
   {
-    id: 'confidence_calibration',
-    text: 'Confidence values should reflect evidence directness. Features backed by explicit, unambiguous identifiers (service name labels, namespace, container image tags) may claim high confidence. Features inferred indirectly (dependencies inferred from log messages, schemas inferred from field structure, technologies guessed from stack traces) should have lower confidence. Features with weak or indirect evidence should not claim confidence=100.',
+    id: 'direct_evidence_high_confidence',
+    text: 'Features backed by explicit, unambiguous identifiers (service name labels, namespace, container image tags) should claim high confidence values.',
+    score: 1,
+  },
+  {
+    id: 'indirect_evidence_lower_confidence',
+    text: 'Features inferred indirectly (dependencies from log messages, schemas from field structure, technologies from stack traces) should have lower confidence than directly-evidenced features.',
+    score: 1,
+  },
+  {
+    id: 'no_false_certainty',
+    text: 'Features with weak or indirect evidence should not claim confidence=100.',
     score: 1,
   },
 ];

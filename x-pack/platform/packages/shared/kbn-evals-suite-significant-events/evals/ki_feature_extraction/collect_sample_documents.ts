@@ -57,21 +57,25 @@ export const collectSampleDocuments = async ({
 
   const docs: Array<SearchHit<Record<string, unknown>>> = [];
   const seen = new Set<string>();
-  const criteriaWithFilter = scenario.output.criteria.filter(
-    (criterion) => criterion.sampling_filter
+  const criteriaWithFilters = scenario.output.criteria.filter(
+    (criterion) => (criterion.sampling_filters?.length ?? 0) > 0
   );
 
   const samplingFilterResults = await Promise.all(
-    criteriaWithFilter.map(async (criterion) => {
-      const { hits } = await getSampleDocuments({
-        esClient,
-        index: MANAGED_STREAM_SEARCH_PATTERN,
-        start: 0,
-        end: Date.now(),
-        filter: [...query, ...criterion.sampling_filter!],
-        size: 1,
+    criteriaWithFilters.flatMap((criterion) => {
+      const { sampling_filters = [], ...details } = criterion;
+
+      return sampling_filters.map(async (filter) => {
+        const { hits } = await getSampleDocuments({
+          esClient,
+          index: MANAGED_STREAM_SEARCH_PATTERN,
+          start: 0,
+          end: Date.now(),
+          filter: [...query, filter],
+          size: 1,
+        });
+        return { hits, criterion: details, filter };
       });
-      return { hits, criterion };
     })
   );
 
@@ -108,7 +112,7 @@ export const collectSampleDocuments = async ({
   }
 
   log.info(
-    `Successfully collected ${docs.length} sample documents (${criteriaWithFilter.length} criteria with sampling filter)`
+    `Successfully collected ${docs.length} sample documents (${criteriaWithFilters.length} criteria with sampling filters)`
   );
   return docs;
 };

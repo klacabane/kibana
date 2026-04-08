@@ -41,7 +41,9 @@ export interface KIQueryGenerationScenario {
 }
 
 export interface SamplingCriterion extends EvaluationCriterionStructured {
-  sampling_filter?: QueryDslQueryContainer[];
+  // Query filters used to collect sample documents that match this criterion.
+  // Each filter is executed individually to collect exactly one sample document.
+  sampling_filters?: QueryDslQueryContainer[];
 }
 
 export interface KIFeatureExtractionScenario {

@@ -98,14 +98,12 @@ export const collectSampleDocuments = async ({
     addUniqueHitsToSample({ hits, docs, seen });
   }
 
-  const criteriaWithFilterAndNoHits = samplingFilterResults.filter(({ hits }) => hits.length === 0);
-  if (criteriaWithFilterAndNoHits.length > 0) {
+  const samplingFiltersWithNoHits = samplingFilterResults.filter(({ hits }) => hits.length === 0);
+  if (samplingFiltersWithNoHits.length > 0) {
     log.warning(
-      `${
-        criteriaWithFilterAndNoHits.length
-      } criteria defined a sampling filter but returned no matching document:\n
-      ${criteriaWithFilterAndNoHits
-        .map(({ criterion }) => JSON.stringify(criterion, null, 2))
+      `${samplingFiltersWithNoHits.length} sampling filters returned no matching document:\n
+      ${samplingFiltersWithNoHits
+        .map(({ criterion, filter }) => JSON.stringify({ criterion, filter }, null, 2))
         .join('\n')}`
     );
     return docs;

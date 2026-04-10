@@ -125,6 +125,7 @@ export class StorageIndexAdapter<
   TApplicationType extends Partial<StorageDocumentOf<TStorageSettings>>
 > {
   private readonly logger: Logger;
+
   constructor(
     private readonly esClient: ElasticsearchClient,
     logger: Logger,
@@ -268,6 +269,29 @@ export class StorageIndexAdapter<
   }
 
   /**
+   * If a write index already exists and its mappings are stale,
+   * updates the index template and pushes the new mappings.
+   * No-op when no index exists yet (preserving lazy-write semantics)
+   * or when mappings are already up-to-date.
+   */
+  private async updateMappingsIfNeeded(): Promise<void> {
+    const expectedSchemaVersion = getSchemaVersion(this.storage);
+
+    const writeIndex = await this.getCurrentWriteIndex();
+    if (!writeIndex) {
+      return;
+    }
+
+    if (writeIndex.state.mappings?._meta?.version !== expectedSchemaVersion) {
+      this.logger.debug(
+        `Updating index template and mappings of existing index due to schema version mismatch`
+      );
+      await this.createOrUpdateIndexTemplate();
+      await this.updateMappingsOfExistingIndex({ name: writeIndex.name });
+    }
+  }
+
+  /**
    * Validates whether:
    * - an index template exists
    * - the index template has the right version (if not, update it)
@@ -292,49 +316,56 @@ export class StorageIndexAdapter<
     return await cb();
   }
 
+  private async ensureMappingsBeforeReading<T>(cb: () => Promise<T>): Promise<T> {
+    await this.updateMappingsIfNeeded();
+    return await cb();
+  }
+
   private search: StorageClientSearch<TApplicationType> = async (request, transportOptions) => {
-    const searchRequest = {
-      ...request,
-      index: this.getSearchIndexPattern(),
-      allow_no_indices: true,
-    };
-    return (await wrapEsCall(
-      this.esClient
-        .search(searchRequest, ...optionalTransportArgs(transportOptions))
-        .then((response) => {
-          return {
-            ...response,
-            hits: {
-              ...response.hits,
-              hits: response.hits.hits.map((hit) => ({
-                ...hit,
-                _source: this.maybeMigrateSource(hit._source),
-              })),
-            },
-          };
-        })
-        .catch((error): StorageClientSearchResponse<TApplicationType, any> => {
-          if (isNotFoundError(error)) {
+    return this.ensureMappingsBeforeReading(async () => {
+      const searchRequest = {
+        ...request,
+        index: this.getSearchIndexPattern(),
+        allow_no_indices: true,
+      };
+      return (await wrapEsCall(
+        this.esClient
+          .search(searchRequest, ...optionalTransportArgs(transportOptions))
+          .then((response) => {
             return {
-              _shards: {
-                failed: 0,
-                successful: 0,
-                total: 0,
-              },
+              ...response,
               hits: {
-                hits: [],
-                total: {
-                  relation: 'eq',
-                  value: 0,
-                },
+                ...response.hits,
+                hits: response.hits.hits.map((hit) => ({
+                  ...hit,
+                  _source: this.maybeMigrateSource(hit._source),
+                })),
               },
-              timed_out: false,
-              took: 0,
             };
-          }
-          throw error;
-        })
-    )) as unknown as ReturnType<StorageClientSearch<TApplicationType>>;
+          })
+          .catch((error): StorageClientSearchResponse<TApplicationType, any> => {
+            if (isNotFoundError(error)) {
+              return {
+                _shards: {
+                  failed: 0,
+                  successful: 0,
+                  total: 0,
+                },
+                hits: {
+                  hits: [],
+                  total: {
+                    relation: 'eq',
+                    value: 0,
+                  },
+                },
+                timed_out: false,
+                took: 0,
+              };
+            }
+            throw error;
+          })
+      )) as unknown as ReturnType<StorageClientSearch<TApplicationType>>;
+    });
   };
 
   private index: StorageClientIndex<TApplicationType> = async (

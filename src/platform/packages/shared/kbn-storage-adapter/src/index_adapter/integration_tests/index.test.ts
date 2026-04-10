@@ -458,6 +458,7 @@ describe('StorageIndexAdapter', () => {
     });
 
     it('updates stale mappings before the first search', async () => {
+      jest.spyOn(getSchemaVersionModule, 'getSchemaVersion').mockReturnValue('current_version');
       await client.index({ id: 'doc1', document: { foo: 'bar' } });
       await verifyIndex();
 

@@ -219,6 +219,8 @@ export {
   featureStatusSchema,
 } from './src/feature';
 
+export { FeatureAccumulator } from './src/feature_accumulator';
+
 export {
   type BaseSimulationError,
   type SimulationError,

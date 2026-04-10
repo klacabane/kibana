@@ -18,6 +18,7 @@ import {
   type IterationResult,
   type BaseFeature,
   type Feature,
+  FeatureAccumulator,
   isComputedFeature,
   isDuplicateFeature,
   mergeFeature,
@@ -27,6 +28,7 @@ import {
 } from '@kbn/streams-schema';
 import {
   identifyFeatures,
+  toPreviouslyIdentifiedFeature,
   generateAllComputedFeatures,
   sumTokens,
   type ExcludedFeatureSummary,
@@ -54,70 +56,6 @@ const DOCUMENTS_BATCH_SIZE = 20;
 const EMPTY_TOKENS: ChatCompletionTokenCount = { prompt: 0, completion: 0, total: 0, cached: 0 };
 const MAX_PREVIOUSLY_IDENTIFIED_FEATURES = 100;
 const MAX_EXCLUDED_FEATURES_FOR_PROMPT = 10;
-
-class FeatureAccumulator {
-  private readonly byUuid = new Map<string, Feature>();
-  private readonly byLowerId = new Map<string, Feature>();
-  private readonly fromStorage = new Set<string>();
-
-  constructor(initialFeatures: Feature[] = []) {
-    for (const f of initialFeatures) {
-      this.add(f);
-      this.fromStorage.add(f.uuid);
-    }
-  }
-
-  add(feature: Feature) {
-    this.byUuid.set(feature.uuid, feature);
-    this.byLowerId.set(feature.id.toLowerCase(), feature);
-  }
-
-  update(feature: Feature) {
-    if (!this.byUuid.has(feature.uuid)) {
-      return;
-    }
-    this.byUuid.set(feature.uuid, feature);
-    this.byLowerId.set(feature.id.toLowerCase(), feature);
-  }
-
-  findDuplicate(candidate: BaseFeature): Feature | undefined {
-    return (
-      this.byLowerId.get(candidate.id.toLowerCase()) ??
-      this.getAll().find((f) => isDuplicateFeature(f, candidate))
-    );
-  }
-
-  isStoredFeature(feature: Feature): boolean {
-    return this.fromStorage.has(feature.uuid);
-  }
-
-  promoteFromStorage(featureUuid: string) {
-    this.fromStorage.delete(featureUuid);
-  }
-
-  getAll(): Feature[] {
-    return Array.from(this.byUuid.values());
-  }
-
-  getDiscovered(): Feature[] {
-    return this.getAll().filter((f) => !this.fromStorage.has(f.uuid));
-  }
-
-  getTopRanked(limit: number): Feature[] {
-    return this.getAll()
-      .sort((a, b) => {
-        const aEntity = a.type === 'entity' ? 0 : 1;
-        const bEntity = b.type === 'entity' ? 0 : 1;
-        if (aEntity !== bEntity) return aEntity - bEntity;
-        return b.confidence - a.confidence;
-      })
-      .slice(0, limit);
-  }
-
-  public get length(): number {
-    return this.byUuid.size;
-  }
-}
 
 export interface IterationTelemetry {
   iteration: number;
@@ -227,14 +165,7 @@ export async function identifyStreamFeatures({
       systemPrompt,
       logger,
       signal,
-      previouslyIdentifiedFeatures: previousFeatures.map((f) => ({
-        id: f.id,
-        type: f.type,
-        subtype: f.subtype,
-        title: f.title,
-        description: f.description,
-        properties: f.properties,
-      })),
+      previouslyIdentifiedFeatures: previousFeatures.map(toPreviouslyIdentifiedFeature),
     };
 
     const emitFailedIteration = (sinceMs: number) =>

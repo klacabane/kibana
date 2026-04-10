@@ -389,12 +389,11 @@ export const otelDemoDataset: DatasetConfig = {
       },
     },
   ],
-  kiFeatureDuplication: [
+  kiFeatureDeduplication: [
     {
       input: {
         scenario_id: 'healthy-baseline',
-        sample_document_count: 20,
-        runs: 5,
+        iterations: 5,
       },
     },
   ],

@@ -95,6 +95,6 @@ export type {
   KIQueryGenerationScenario,
   KIFeatureExtractionScenario,
   KIFeatureExclusionScenario,
-  KIFeatureDuplicationScenario,
+  KIFeatureDeduplicationScenario,
   SnapshotSourceOverride,
 } from './types';

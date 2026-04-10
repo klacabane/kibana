@@ -1,6 +1,6 @@
 # Significant Events Evaluations
 
-Evaluations for Significant Events, which assess the quality of LLM-based Knowledge Indicator (KI) feature extraction, KI query generation, KI feature exclusion, and KI feature duplication across failure scenarios.
+Evaluations for Significant Events, which assess the quality of LLM-based Knowledge Indicator (KI) feature extraction, KI query generation, KI feature exclusion, and KI feature deduplication across failure scenarios.
 These evaluations support both qualitative (LLM-as-a-judge + deterministic CODE evaluators) and quantitative (trace-based) metrics.
 
 For general information about writing evaluation tests, configuration, and usage, see the main [`@kbn/evals` documentation](../kbn-evals/README.md).
@@ -12,7 +12,7 @@ For general information about writing evaluation tests, configuration, and usage
 | **KI feature extraction** | `ki_feature_extraction/ki_feature_extraction.spec.ts` | Can the LLM identify entities, dependencies, and infrastructure from raw log samples? |
 | **KI query generation** | `ki_query_generation/ki_query_generation.spec.ts` | Can the LLM produce valid, hit-producing ES\|QL rules for significant event detection? |
 | **KI feature exclusion** | `ki_feature_exclusion/ki_feature_exclusion.spec.ts` | Does the LLM respect excluded features and avoid regenerating them in follow-up runs? |
-| **KI feature duplication** | `ki_feature_duplication/ki_feature_duplication.spec.ts` | Are KIs stable and semantically unique across repeated extraction runs? |
+| **KI feature deduplication** | `ki_feature_deduplication/ki_feature_deduplication.spec.ts` | Are KIs stable and semantically unique across independent runs and iterative dedup loops? |
 
 ## Prerequisites
 
@@ -161,7 +161,9 @@ node scripts/evals run \
 | **confidence_bounds** | KI feature extraction | No KI exceeds the maximum confidence threshold |
 | **type_assertions** | KI feature extraction | Required types are present; forbidden types are absent |
 | **ki_query_generation_code_evaluator** | KI query generation | ES\|QL syntax validity and execution hit rate |
-| **ki_feature_duplication** | KI feature duplication | Structural deduplication |
+| **structural** | KI feature deduplication | Structural deduplication in the final accumulated feature set |
+| **id_reuse** | KI feature deduplication | Re-emitted features keep their original id across iterations |
+| **discovery_rate** | KI feature deduplication | New features discovered across iterations |
 
 ### LLM-as-a-judge evaluators
 
@@ -169,8 +171,7 @@ node scripts/evals run \
 | --- | --- | --- |
 | **scenario_criteria** | KI feature extraction, KI query generation | Scenario-specific criteria (e.g. "must identify payment service") |
 | **llm_exclude_compliance** | KI feature exclusion | Excluded features are not regenerated in follow-up identification runs |
-| **llm_semantic_uniqueness** | KI feature duplication | Semantic deduplication across KIs |
-| **llm_id_consistency** | KI feature duplication | Same KI ID refers to the same concept across runs |
+| **llm_semantic_uniqueness** | KI feature deduplication | Semantic deduplication of the final accumulated feature set |
 
 ### Trace-based evaluators
 

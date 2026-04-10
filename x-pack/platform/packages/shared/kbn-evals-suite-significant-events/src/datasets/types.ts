@@ -83,11 +83,10 @@ export interface KIFeatureExclusionScenario {
   snapshot_source?: SnapshotSourceOverride;
 }
 
-export interface KIFeatureDuplicationScenario {
+export interface KIFeatureDeduplicationScenario {
   input: {
     scenario_id: string;
-    sample_document_count: number;
-    runs: number;
+    iterations: number;
   };
   snapshot_source?: SnapshotSourceOverride;
 }
@@ -99,5 +98,5 @@ export interface DatasetConfig {
   kiQueryGeneration: KIQueryGenerationScenario[];
   kiFeatureExtraction: KIFeatureExtractionScenario[];
   kiFeatureExclusion: KIFeatureExclusionScenario[];
-  kiFeatureDuplication: KIFeatureDuplicationScenario[];
+  kiFeatureDeduplication: KIFeatureDeduplicationScenario[];
 }

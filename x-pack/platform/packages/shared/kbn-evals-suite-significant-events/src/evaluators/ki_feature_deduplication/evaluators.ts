@@ -5,104 +5,20 @@
  * 2.0.
  */
 
-import {
-  hasSameFingerprint,
-  isDuplicateFeature,
-  type BaseFeature,
-} from '@kbn/streams-schema';
+import { hasSameFingerprint, type BaseFeature } from '@kbn/streams-schema';
 import { uniqBy, uniqWith } from 'lodash';
 import type { BoundInferenceClient } from '@kbn/inference-common';
 import { executeUntilValid } from '@kbn/inference-prompt-utils';
 import { SemanticUniquenessPrompt } from './semantic_uniqueness/prompt';
 
-interface IterationOutput {
-  features: BaseFeature[];
-  previousFeatureCount: number;
-}
-
 interface DedupLoopOutput {
-  iterations: IterationOutput[];
+  iterations: Array<{
+    features: BaseFeature[];
+    previousFeatureCount: number;
+  }>;
   finalFeatures: BaseFeature[];
   traceId?: string | null;
 }
-
-/**
- * ID re-use evaluator (CODE). When a feature returned in iteration N
- * matches (via isDuplicateFeature) something that was passed as
- * previouslyIdentifiedFeatures, it should re-use the same id.
- *
- * Score = correctly_reused / total_matches_to_previous.
- * A score of 1 means every time the LLM re-emitted a known feature,
- * it kept the original id.
- */
-export const idReuseEvaluator = {
-  name: 'id_reuse',
-  kind: 'CODE' as const,
-  evaluate: async ({ output }: { output: DedupLoopOutput }) => {
-    const { iterations, finalFeatures } = output;
-
-    if (iterations.length <= 1 || finalFeatures.length === 0) {
-      return {
-        score: null,
-        explanation: 'Inconclusive: need at least 2 iterations to evaluate id reuse',
-      };
-    }
-
-    let totalMatchesToPrevious = 0;
-    let correctlyReused = 0;
-    let accumulatedFeatures: BaseFeature[] = [];
-
-    for (const iteration of iterations) {
-      if (accumulatedFeatures.length === 0) {
-        accumulatedFeatures = [...iteration.features];
-        continue;
-      }
-
-      for (const feature of iteration.features) {
-        const matchInPrevious = accumulatedFeatures.find((prev) =>
-          isDuplicateFeature(prev, feature)
-        );
-
-        if (matchInPrevious) {
-          totalMatchesToPrevious++;
-          if (feature.id.toLowerCase() === matchInPrevious.id.toLowerCase()) {
-            correctlyReused++;
-          }
-        }
-      }
-
-      for (const feature of iteration.features) {
-        const existingIdx = accumulatedFeatures.findIndex((prev) =>
-          isDuplicateFeature(prev, feature)
-        );
-        if (existingIdx >= 0) {
-          accumulatedFeatures[existingIdx] = feature;
-        } else {
-          accumulatedFeatures.push(feature);
-        }
-      }
-    }
-
-    if (totalMatchesToPrevious === 0) {
-      return {
-        score: null,
-        explanation: 'Inconclusive: no features matched previouslyIdentifiedFeatures across iterations',
-      };
-    }
-
-    const score = correctlyReused / totalMatchesToPrevious;
-
-    return {
-      score,
-      explanation: `${correctlyReused}/${totalMatchesToPrevious} re-emitted features used the correct id`,
-      metadata: {
-        total_matches_to_previous: totalMatchesToPrevious,
-        correctly_reused: correctlyReused,
-        mismatched: totalMatchesToPrevious - correctlyReused,
-      },
-    };
-  },
-};
 
 /**
  * Checks that all unique-by-id KIs in the final accumulated set are

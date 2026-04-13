@@ -153,18 +153,17 @@ node scripts/evals run \
 
 ### Deterministic (CODE) evaluators
 
-| Evaluator                              | Suite                  | Description                                                                               |
-| -------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------- |
-| **type_validation**                    | KI feature extraction  | All KI types are valid (`entity`, `infrastructure`, `technology`, `dependency`, `schema`) |
-| **evidence_coverage**                  | KI feature extraction  | Every KI feature includes at least one evidence string                                    |
-| **evidence_grounding**                 | KI feature extraction  | Evidence strings are grounded in input documents; `evidence_doc_ids` reference real docs  |
-| **ki_feature_count**                   | KI feature extraction  | KI feature count falls within expected bounds                                             |
-| **type_assertions**                    | KI feature extraction  | Required types are present; forbidden types are absent                                    |
-| **filter_coverage**                    | KI feature extraction  | Every entity feature includes a filter condition (when `expect_entity_filters: true`)     |
-| **filter_grounding**                   | KI feature extraction  | Entity filter equality pairs are grounded in input sample documents                       |
-| **ki_query_generation_code_evaluator** | KI query generation    | ES\|QL syntax validity, category/severity compliance, and execution hit rate              |
-| **tool_usage_validation**              | KI query generation    | Validates `get_stream_features` and `add_queries` tool calls were invoked correctly       |
-| **ki_feature_duplication**             | KI feature duplication | Structural deduplication                                                                  |
+| Evaluator                              | Suite                    | Description                                                                               |
+| -------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------- |
+| **type_validation**                    | KI feature extraction    | All KI types are valid (`entity`, `infrastructure`, `technology`, `dependency`, `schema`) |
+| **evidence_coverage**                  | KI feature extraction    | Every KI feature includes at least one evidence string                                    |
+| **evidence_grounding**                 | KI feature extraction    | Evidence strings are grounded in input documents; `evidence_doc_ids` reference real docs  |
+| **ki_feature_count**                   | KI feature extraction    | KI feature count falls within expected bounds                                             |
+| **type_assertions**                    | KI feature extraction    | Required types are present; forbidden types are absent                                    |
+| **filter_coverage**                    | KI feature extraction    | Every entity feature includes a filter condition (when `expect_entity_filters: true`)     |
+| **filter_grounding**                   | KI feature extraction    | Entity filter equality pairs are grounded in input sample documents                       |
+| **ki_query_generation_code_evaluator** | KI query generation      | ES\|QL syntax validity, category/severity compliance, and execution hit rate              |
+| **tool_usage_validation**              | KI query generation      | Validates `get_stream_features` and `add_queries` tool calls were invoked correctly       |
 
 ### LLM-as-a-judge evaluators
 
@@ -175,8 +174,7 @@ node scripts/evals run \
 | **Factuality**              | KI feature extraction                      | LLM-judged factual accuracy of extracted features against expected ground truth                                 |
 | **Relevance**               | KI feature extraction                      | LLM-judged relevance of extracted features to the failure domain                                                |
 | **llm_exclude_compliance**  | KI feature exclusion                       | Excluded features don't reappear in follow-up runs; non-excluded features are preserved                         |
-| **llm_semantic_uniqueness** | KI feature duplication                     | Semantic deduplication across KIs                                                                               |
-| **llm_id_consistency**      | KI feature duplication                     | Same KI ID refers to the same concept across runs                                                               |
+| **llm_semantic_uniqueness** | KI feature deduplication                   | All unique-by-id KIs in the final accumulated set are semantically distinct                                     |
 
 ### Trace-based evaluators
 

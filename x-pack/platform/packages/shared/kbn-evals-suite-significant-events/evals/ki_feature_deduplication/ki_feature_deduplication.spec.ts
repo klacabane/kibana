@@ -19,10 +19,7 @@ import {
   replaySignificantEventsSnapshot,
 } from '../../src/data_generators/replay';
 import { evaluate } from '../../src/evaluate';
-import {
-  idReuseEvaluator,
-  createSemanticUniquenessEvaluator,
-} from '../../src/evaluators/ki_feature_deduplication/evaluators';
+import { createSemanticUniquenessEvaluator } from '../../src/evaluators/ki_feature_deduplication/evaluators';
 import {
   getActiveDatasets,
   MANAGED_STREAM_NAME,
@@ -189,7 +186,6 @@ evaluate.describe(
                 },
               },
               [
-                idReuseEvaluator,
                 createSemanticUniquenessEvaluator({
                   inferenceClient: evaluatorInferenceClient,
                 }),

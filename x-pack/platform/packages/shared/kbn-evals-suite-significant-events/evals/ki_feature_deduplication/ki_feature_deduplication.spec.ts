@@ -20,9 +20,7 @@ import {
 } from '../../src/data_generators/replay';
 import { evaluate } from '../../src/evaluate';
 import {
-  structuralEvaluator,
   idReuseEvaluator,
-  discoveryRateEvaluator,
   createSemanticUniquenessEvaluator,
 } from '../../src/evaluators/ki_feature_deduplication/evaluators';
 import {
@@ -191,9 +189,7 @@ evaluate.describe(
                 },
               },
               [
-                structuralEvaluator,
                 idReuseEvaluator,
-                discoveryRateEvaluator,
                 createSemanticUniquenessEvaluator({
                   inferenceClient: evaluatorInferenceClient,
                 }),

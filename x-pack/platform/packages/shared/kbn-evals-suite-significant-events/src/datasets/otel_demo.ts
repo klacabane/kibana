@@ -84,7 +84,14 @@ export const otelDemoDataset: DatasetConfig = {
             text: 'Must identify the dependency checkout → payment (evidence: 74 checkout docs log "payment went through (transaction_id: ...)" correlating with payment "Charge request received" / "Transaction complete")',
             score: 2,
             sampling_filters: [
-              { term: { 'resource.attributes.app': 'checkout' } },
+              {
+                bool: {
+                  filter: [
+                    { term: { 'resource.attributes.app': 'checkout' } },
+                    { match_phrase: { 'body.text': 'payment went through' } },
+                  ],
+                },
+              },
               { term: { 'resource.attributes.app': 'payment' } },
             ],
           },

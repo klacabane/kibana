@@ -17,7 +17,7 @@ import { parseError } from '../../../streams/errors/parse_error';
 
 const EMPTY_SAMPLE: { hits: Array<SearchHit<Record<string, unknown>>> } = { hits: [] };
 
-const DEFAULT_SAMPLE_SIZE = 20;
+export const DEFAULT_SAMPLE_SIZE = 20;
 // The sample is split into three buckets to balance novelty and coverage:
 //  - Entity-filtered (ENTITY_FILTERED_RATIO): diverse docs that exclude known features
 //    via must_not filters, biasing toward undiscovered patterns.

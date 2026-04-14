@@ -5,17 +5,24 @@
  * 2.0.
  */
 
-import { hasSameFingerprint, type BaseFeature } from '@kbn/streams-schema';
+import { hasSameFingerprint, type BaseFeature, type Feature } from '@kbn/streams-schema';
 import { uniqBy, uniqWith } from 'lodash';
 import type { BoundInferenceClient } from '@kbn/inference-common';
 import { executeUntilValid } from '@kbn/inference-prompt-utils';
 import { SemanticUniquenessPrompt } from './semantic_uniqueness/prompt';
+import { MergeCorrectnessPrompt } from './merge_correctness/prompt';
+
+interface MergeEvent {
+  existing: BaseFeature;
+  incoming: BaseFeature;
+}
 
 interface DedupLoopOutput {
   iterations: Array<{
     features: BaseFeature[];
     previousFeatureCount: number;
   }>;
+  mergeEvents: MergeEvent[];
   finalFeatures: BaseFeature[];
   traceId?: string | null;
 }
@@ -109,6 +116,102 @@ export const createSemanticUniquenessEvaluator = ({
         duplicate_clusters,
         unique_by_id: uniqueById,
         unique_by_fingerprint: uniqueByFingerprint,
+        features: compactUniqueKIs,
+      },
+    };
+  },
+});
+
+const compactFeature = (feature: BaseFeature) => ({
+  id: feature.id,
+  type: feature.type,
+  subtype: feature.subtype,
+  title: feature.title,
+  properties: feature.properties,
+  description: feature.description?.slice(0, 300),
+});
+
+/**
+ * Evaluates whether id-based feature merges are semantically correct.
+ * Score = correct merges / total merges. A score < 1 means some merges
+ * combined features that represent different real-world concepts.
+ */
+export const createMergeCorrectnessEvaluator = ({
+  inferenceClient,
+}: {
+  inferenceClient: BoundInferenceClient;
+}) => ({
+  name: 'llm_merge_correctness',
+  kind: 'LLM' as const,
+  evaluate: async ({
+    input,
+    output,
+  }: {
+    input: { stream_name: string };
+    output: DedupLoopOutput;
+  }) => {
+    const { mergeEvents } = output;
+
+    if (mergeEvents.length === 0) {
+      return { score: null, explanation: 'Inconclusive: no merge events to evaluate' };
+    }
+
+    const compactEvents = mergeEvents.map((event) => ({
+      existing: compactFeature(event.existing),
+      incoming: compactFeature(event.incoming),
+    }));
+
+    const response = await executeUntilValid({
+      prompt: MergeCorrectnessPrompt,
+      inferenceClient,
+      input: {
+        stream_name: input?.stream_name,
+        merge_events: JSON.stringify(compactEvents),
+      },
+      finalToolChoice: { function: 'evaluate_merges' as const },
+      maxRetries: 3,
+      toolCallbacks: {
+        evaluate_merges: async (toolCall) => {
+          const { results } = toolCall.function.arguments;
+
+          if (results.length !== compactEvents.length) {
+            throw new Error(
+              `Expected ${compactEvents.length} results (one per merge event), got ${results.length}`
+            );
+          }
+
+          for (const result of results) {
+            if (result.index < 0 || result.index >= compactEvents.length) {
+              throw new Error(
+                `Result index ${result.index} is out of bounds (0..${compactEvents.length - 1})`
+              );
+            }
+          }
+
+          return { response: toolCall.function.arguments };
+        },
+      },
+    });
+
+    const { results, explanation } = response.toolCalls[0].function.arguments;
+    const correctCount = results.filter((r: { correct: boolean }) => r.correct).length;
+    const score = correctCount / mergeEvents.length;
+
+    const incorrectMerges = results
+      .filter((r: { correct: boolean }) => !r.correct)
+      .map((r: { index: number; reason: string }) => ({
+        existing: compactEvents[r.index].existing,
+        incoming: compactEvents[r.index].incoming,
+        reason: r.reason,
+      }));
+
+    return {
+      score,
+      explanation,
+      metadata: {
+        total_merges: mergeEvents.length,
+        correct_merges: correctCount,
+        incorrect_merges: incorrectMerges,
       },
     };
   },

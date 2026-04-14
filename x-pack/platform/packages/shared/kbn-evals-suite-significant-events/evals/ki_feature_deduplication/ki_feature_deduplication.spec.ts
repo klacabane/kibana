@@ -9,7 +9,7 @@ import { identifyFeatures, toPreviouslyIdentifiedFeature } from '@kbn/streams-ai
 import { featuresPrompt } from '@kbn/streams-ai/src/features/prompt';
 import { tags } from '@kbn/scout';
 import { getCurrentTraceId } from '@kbn/evals';
-import { type Feature, FeatureAccumulator, type BaseFeature } from '@kbn/streams-schema';
+import { FeatureAccumulator, type BaseFeature, mergeFeature } from '@kbn/streams-schema';
 import { v4 as uuidv4 } from 'uuid';
 import type { GcsConfig } from '../../src/data_generators/replay';
 import {
@@ -19,7 +19,10 @@ import {
   replaySignificantEventsSnapshot,
 } from '../../src/data_generators/replay';
 import { evaluate } from '../../src/evaluate';
-import { createSemanticUniquenessEvaluator } from '../../src/evaluators/ki_feature_deduplication/evaluators';
+import {
+  createSemanticUniquenessEvaluator,
+  createMergeCorrectnessEvaluator,
+} from '../../src/evaluators/ki_feature_deduplication/evaluators';
 import {
   getActiveDatasets,
   MANAGED_STREAM_NAME,
@@ -135,6 +138,7 @@ evaluate.describe(
                     previousFeatureCount: number;
                   }> = [];
                   const accumulated = new FeatureAccumulator();
+                  const mergeEvents = [];
 
                   for (let i = 0; i < input.iterations; i++) {
                     const sampleDocuments = await collectSampleDocuments({
@@ -164,22 +168,33 @@ evaluate.describe(
 
                     for (const baseFeature of identifiedFeatures) {
                       const existing = accumulated.findDuplicate(baseFeature);
-                      const feature: Feature = {
-                        ...baseFeature,
-                        uuid: existing?.uuid ?? uuidv4(),
-                        status: 'active',
-                        last_seen: new Date().toISOString(),
-                      };
                       if (existing) {
-                        accumulated.update(feature);
+                        if (existing.id.toLowerCase() === baseFeature.id.toLowerCase()) {
+                          // only store an event if the id is the same
+                          mergeEvents.push({ existing, incoming: baseFeature });
+                        }
+                        const merged = mergeFeature(existing, baseFeature);
+
+                        accumulated.update({
+                          ...merged,
+                          uuid: existing.uuid,
+                          status: 'active',
+                          last_seen: new Date().toISOString(),
+                        });
                       } else {
-                        accumulated.add(feature);
+                        accumulated.add({
+                          ...baseFeature,
+                          uuid: uuidv4(),
+                          status: 'active',
+                          last_seen: new Date().toISOString(),
+                        });
                       }
                     }
                   }
 
                   return {
                     iterations,
+                    mergeEvents,
                     finalFeatures: accumulated.getAll(),
                     traceId: getCurrentTraceId(),
                   };
@@ -187,6 +202,9 @@ evaluate.describe(
               },
               [
                 createSemanticUniquenessEvaluator({
+                  inferenceClient: evaluatorInferenceClient,
+                }),
+                createMergeCorrectnessEvaluator({
                   inferenceClient: evaluatorInferenceClient,
                 }),
               ]

@@ -1,0 +1,8 @@
+Evaluate the following feature merge events for correctness:
+
+**Stream name**: {{{stream_name}}}
+
+**Merge events** (JSON array — each element has `existing` and `incoming` feature objects):
+{{{merge_events}}}
+
+For each merge event, decide whether the merge is correct or incorrect. Then call the `evaluate_merges` tool with your findings.

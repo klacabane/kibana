@@ -10,6 +10,7 @@ import type { Client } from '@elastic/elasticsearch';
 import type { SearchHit } from '@elastic/elasticsearch/lib/api/types';
 import type { ToolingLog } from '@kbn/tooling-log';
 import { getSampleDocuments } from '@kbn/ai-tools';
+import { DEFAULT_SIG_EVENTS_TUNING_CONFIG } from '@kbn/streams-plugin/common/sig_events_tuning_config';
 import {
   MANAGED_STREAM_SEARCH_PATTERN,
   type KIFeatureExtractionScenario,
@@ -48,7 +49,7 @@ export const collectSampleDocuments = async ({
   esClient,
   scenario,
   log,
-  size = 20,
+  size = DEFAULT_SIG_EVENTS_TUNING_CONFIG.sample_size,
 }: {
   esClient: Client;
   scenario: KIFeatureExtractionScenario;

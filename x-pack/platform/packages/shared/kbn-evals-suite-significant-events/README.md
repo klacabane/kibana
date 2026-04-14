@@ -175,6 +175,7 @@ node scripts/evals run \
 | **Relevance**               | KI feature extraction                      | LLM-judged relevance of extracted features to the failure domain                                                |
 | **llm_exclude_compliance**  | KI feature exclusion                       | Excluded features don't reappear in follow-up runs; non-excluded features are preserved                         |
 | **llm_semantic_uniqueness** | KI feature deduplication                   | All unique-by-id KIs in the final accumulated set are semantically distinct                                     |
+| **llm_merge_correctness**   | KI feature deduplication                   | Id-based feature merges across iterations are semantically justified (same real-world concept)                   |
 
 ### Trace-based evaluators
 

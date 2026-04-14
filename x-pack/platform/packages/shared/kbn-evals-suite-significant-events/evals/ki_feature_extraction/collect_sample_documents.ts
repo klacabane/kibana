@@ -10,7 +10,6 @@ import type { Client } from '@elastic/elasticsearch';
 import type { SearchHit } from '@elastic/elasticsearch/lib/api/types';
 import type { ToolingLog } from '@kbn/tooling-log';
 import { getSampleDocuments } from '@kbn/ai-tools';
-import { DEFAULT_SAMPLE_SIZE } from '@kbn/streams-plugin/server/lib/tasks/task_definitions/features_identification/fetch_sample_documents';
 import {
   MANAGED_STREAM_SEARCH_PATTERN,
   type KIFeatureExtractionScenario,
@@ -49,7 +48,7 @@ export const collectSampleDocuments = async ({
   esClient,
   scenario,
   log,
-  size = DEFAULT_SAMPLE_SIZE,
+  size = 20,
 }: {
   esClient: Client;
   scenario: KIFeatureExtractionScenario;

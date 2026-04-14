@@ -5,7 +5,7 @@
  * 2.0.
  */
 
-import { hasSameFingerprint, type BaseFeature, type Feature } from '@kbn/streams-schema';
+import { hasSameFingerprint, type BaseFeature } from '@kbn/streams-schema';
 import { uniqBy, uniqWith } from 'lodash';
 import type { BoundInferenceClient } from '@kbn/inference-common';
 import { executeUntilValid } from '@kbn/inference-prompt-utils';

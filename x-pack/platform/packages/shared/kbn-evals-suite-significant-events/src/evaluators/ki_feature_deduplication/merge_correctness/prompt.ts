@@ -29,8 +29,7 @@ const MERGE_CORRECTNESS_OUTPUT_SCHEMA = {
           },
           reason: {
             type: 'string',
-            description:
-              'One-sentence explanation of why the merge is correct or incorrect',
+            description: 'One-sentence explanation of why the merge is correct or incorrect',
           },
         },
         required: ['index', 'correct', 'reason'],

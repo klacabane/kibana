@@ -66,7 +66,7 @@ export class FeatureAccumulator {
       .slice(0, limit);
   }
 
-  get length(): number {
+  public get length(): number {
     return this.byUuid.size;
   }
 }

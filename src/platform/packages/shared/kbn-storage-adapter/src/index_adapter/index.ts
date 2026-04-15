@@ -117,14 +117,27 @@ export interface StorageIndexAdapterOptions<TApplicationType> {
  * Adapter for writing and reading documents to/from Elasticsearch,
  * using plain indices.
  *
+ * Index management is lazy — no resources are created at construction time.
+ *
+ * - **Writes** (`index`, `bulk`): ensure the index template, backing index,
+ *   and mappings all exist and are up-to-date before executing.
+ * - **Reads** (`search`, `get`): ensure mappings are up-to-date before
+ *   executing.
+ *
+ * Mapping updates are applied in-place via `putMapping` on the existing
+ * write index — no rollover is performed. This supports additive schema
+ * changes (new fields, new sub-fields) but not incompatible ones
+ * (type changes, field removal).
+ *
  * TODO:
- * - Schema upgrades w/ fallbacks
+ * - Schema upgrades w/ fallbacks (rollover + reindex for incompatible changes)
  */
 export class StorageIndexAdapter<
   TStorageSettings extends IndexStorageSettings,
   TApplicationType extends Partial<StorageDocumentOf<TStorageSettings>>
 > {
   private readonly logger: Logger;
+  private updateMappingsPromise: Promise<void> | undefined;
 
   constructor(
     private readonly esClient: ElasticsearchClient,
@@ -317,8 +330,15 @@ export class StorageIndexAdapter<
   }
 
   private async ensureMappingsBeforeReading<T>(cb: () => Promise<T>): Promise<T> {
-    await this.updateMappingsIfNeeded();
-    return await cb();
+    if (!this.updateMappingsPromise) {
+      this.updateMappingsPromise = this.updateMappingsIfNeeded().catch((error) => {
+        this.updateMappingsPromise = undefined;
+        throw error;
+      });
+    }
+
+    await this.updateMappingsPromise;
+    return cb();
   }
 
   private search: StorageClientSearch<TApplicationType> = async (request, transportOptions) => {
@@ -602,6 +622,10 @@ export class StorageIndexAdapter<
     return _source as TApplicationType;
   };
 
+  /**
+   * Checks whether the backing index exists. No mapping
+   * reconciliation is performed.
+   */
   private existsIndex: StorageClientExistsIndex = () => {
     return this.esClient.indices.exists({
       index: this.getSearchIndexPattern(),

@@ -618,12 +618,12 @@ function reconcileFeatures({
     if (match) {
       if (known.isStoredFeature(match)) {
         // Stored-origin: always update to refresh last_seen / expires_at
-        updatedFeatures.push({ ...raw, ...metadata, uuid: match.uuid });
+        updatedFeatures.push({ ...raw, ...metadata, id: match.id, uuid: match.uuid });
       } else {
         // Intra-run: merge properties accumulated across iterations of this run
         const merged = mergeFeature(match, raw);
         if (hasChanged(merged, match)) {
-          updatedFeatures.push({ ...merged, ...metadata, uuid: match.uuid });
+          updatedFeatures.push({ ...merged, ...metadata, id: match.id, uuid: match.uuid });
         }
       }
     } else {

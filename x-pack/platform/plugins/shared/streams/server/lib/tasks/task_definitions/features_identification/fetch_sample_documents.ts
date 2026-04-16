@@ -50,14 +50,16 @@ export async function fetchSampleDocuments({
     const diverseSize = Math.round(size * diverseRatio);
 
     const [{ hits: diverseHits }, { hits: randomHits }] = await Promise.all([
-      getDiverseSampleDocuments({
-        esClient,
-        index,
-        start,
-        end,
-        size: diverseSize,
-        offset: diverseOffset,
-      }),
+      diverseSize > 0
+        ? getDiverseSampleDocuments({
+            esClient,
+            index,
+            start,
+            end,
+            size: diverseSize,
+            offset: diverseOffset,
+          })
+        : Promise.resolve(EMPTY_SAMPLE),
       getSampleDocuments({ esClient, index, start, end, size }),
     ]);
 
@@ -101,17 +103,19 @@ export async function fetchSampleDocuments({
         logger.warn(`Entity-filtered sampling query failed: ${parseError(err).message}`);
         return EMPTY_SAMPLE;
       }),
-      getDiverseSampleDocuments({
-        esClient,
-        index,
-        start,
-        end,
-        size: diverseSize + entityFilteredSize,
-        offset: diverseOffset,
-      }).catch((err) => {
-        logger.warn(`Diverse sampling query failed: ${parseError(err).message}`);
-        return EMPTY_SAMPLE;
-      }),
+      diverseSize + entityFilteredSize > 0
+        ? getDiverseSampleDocuments({
+            esClient,
+            index,
+            start,
+            end,
+            size: diverseSize + entityFilteredSize,
+            offset: diverseOffset,
+          }).catch((err) => {
+            logger.warn(`Diverse sampling query failed: ${parseError(err).message}`);
+            return EMPTY_SAMPLE;
+          })
+        : Promise.resolve(EMPTY_SAMPLE),
       getSampleDocuments({
         esClient,
         index,

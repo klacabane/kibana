@@ -58,6 +58,9 @@ export async function fetchSampleDocuments({
             end,
             size: diverseSize,
             offset: diverseOffset,
+          }).catch((err) => {
+            logger.warn(`Diverse sampling query failed: ${parseError(err).message}`);
+            return EMPTY_SAMPLE;
           })
         : Promise.resolve(EMPTY_SAMPLE),
       getSampleDocuments({ esClient, index, start, end, size }),

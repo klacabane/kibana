@@ -79,7 +79,7 @@ export async function fetchSampleDocuments({
       totalFilters: 0,
       filtersCapped: false,
       hasFilteredDocuments: false,
-      nextOffset: diverseOffset + bucketCounts.diverse,
+      nextOffset: diverseOffset + diverseHits.length,
     };
   }
 
@@ -144,7 +144,7 @@ export async function fetchSampleDocuments({
     totalFilters: features.length,
     filtersCapped: features.length > maxEntityFilters,
     hasFilteredDocuments: entityFilteredHits.length > 0,
-    nextOffset: diverseOffset + bucketCounts.diverse,
+    nextOffset: diverseOffset + Math.min(diverseHits.length, diverseSize),
   };
 }
 

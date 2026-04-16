@@ -112,16 +112,6 @@ export async function getDiverseSampleDocuments({
     .map((bucket) => bucket.docs.hits.hits[0])
     .filter((hit): hit is SearchHit<Record<string, unknown>> => Boolean(hit?._id));
 
-  console.log(
-    `Fetched ${
-      categoryHits.length
-    } diverse documents with offset ${offset} and size ${size}. Documents:\n${JSON.stringify(
-      categoryHits.map((hit) => hit.fields?.message),
-      null,
-      2
-    )}`
-  );
-
   return { hits: categoryHits };
 }
 

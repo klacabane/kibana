@@ -17,6 +17,8 @@ import { parseError } from '../../../streams/errors/parse_error';
 
 const EMPTY_SAMPLE: { hits: Array<SearchHit<Record<string, unknown>>> } = { hits: [] };
 
+type SamplingStrategy = 'entity-filtered' | 'diverse' | 'random';
+
 export async function fetchSampleDocuments({
   esClient,
   index,
@@ -61,15 +63,15 @@ export async function fetchSampleDocuments({
 
     const { documents, bucketCounts } = mergeDocuments(
       [
-        { hits: diverseHits, cap: diverseSize },
-        { hits: randomHits, cap: size },
+        { hits: diverseHits, cap: diverseSize, label: 'diverse' },
+        { hits: randomHits, cap: size, label: 'random' },
       ],
       size
     );
 
     logger.debug(
       () =>
-        `Sampled ${documents.length} documents (${bucketCounts[0]} diverse, ${bucketCounts[1]} random). No entities available to filter by.`
+        `Sampled ${documents.length} documents (${bucketCounts.diverse} diverse, ${bucketCounts.random} random). No entities available to filter by.`
     );
 
     return {
@@ -77,7 +79,7 @@ export async function fetchSampleDocuments({
       totalFilters: 0,
       filtersCapped: false,
       hasFilteredDocuments: false,
-      nextOffset: diverseOffset + bucketCounts[0],
+      nextOffset: diverseOffset + bucketCounts.diverse,
     };
   }
 
@@ -121,18 +123,18 @@ export async function fetchSampleDocuments({
 
   const { documents, bucketCounts } = mergeDocuments(
     [
-      { hits: entityFilteredHits, cap: entityFilteredSize },
-      { hits: diverseHits, cap: diverseSize },
-      { hits: randomHits, cap: size },
+      { hits: entityFilteredHits, cap: entityFilteredSize, label: 'entity-filtered' },
+      { hits: diverseHits, cap: diverseSize, label: 'diverse' },
+      { hits: randomHits, cap: size, label: 'random' },
     ],
     size
   );
 
   logger.debug(
     () =>
-      `Sampled ${documents.length} documents (${bucketCounts[0]} entity-filtered, ${
-        bucketCounts[1]
-      } diverse, ${bucketCounts[2]} random). ${entityFilters.length} entity filters applied (${
+      `Sampled ${documents.length} documents (${bucketCounts['entity-filtered']} entity-filtered, ${
+        bucketCounts.diverse
+      } diverse, ${bucketCounts.random} random). ${entityFilters.length} entity filters applied (${
         features.length - entityFilters.length
       } omitted):\n${JSON.stringify(entityFilters)}`
   );
@@ -142,7 +144,7 @@ export async function fetchSampleDocuments({
     totalFilters: features.length,
     filtersCapped: features.length > maxEntityFilters,
     hasFilteredDocuments: entityFilteredHits.length > 0,
-    nextOffset: diverseOffset + bucketCounts[1],
+    nextOffset: diverseOffset + bucketCounts.diverse,
   };
 }
 
@@ -150,15 +152,19 @@ function mergeDocuments(
   prioritizedHits: Array<{
     hits: Array<SearchHit<Record<string, unknown>>>;
     cap: number;
+    label: SamplingStrategy;
   }>,
   totalSize: number
-): { documents: Array<SearchHit<Record<string, unknown>>>; bucketCounts: number[] } {
+): {
+  documents: Array<SearchHit<Record<string, unknown>>>;
+  bucketCounts: Record<SamplingStrategy, number>;
+} {
   const seen = new Set<string>();
   const result: Array<SearchHit<Record<string, unknown>>> = [];
-  const bucketCounts = prioritizedHits.map(() => 0);
+  const bucketCounts = { 'entity-filtered': 0, diverse: 0, random: 0 };
 
   for (let i = 0; i < prioritizedHits.length; i++) {
-    const { hits, cap } = prioritizedHits[i];
+    const { hits, cap, label } = prioritizedHits[i];
     let added = 0;
     for (const hit of hits) {
       if (added >= cap || result.length >= totalSize) break;
@@ -167,7 +173,7 @@ function mergeDocuments(
       result.push(hit);
       added++;
     }
-    bucketCounts[i] = added;
+    bucketCounts[label] = added;
   }
 
   return { documents: result, bucketCounts };

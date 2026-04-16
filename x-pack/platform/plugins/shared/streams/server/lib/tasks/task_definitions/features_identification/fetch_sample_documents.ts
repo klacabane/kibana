@@ -28,6 +28,7 @@ export async function fetchSampleDocuments({
   entityFilteredRatio,
   diverseRatio,
   maxEntityFilters,
+  diverseOffset = 0,
 }: {
   esClient: ElasticsearchClient;
   index: string;
@@ -38,6 +39,7 @@ export async function fetchSampleDocuments({
   size: number;
   entityFilteredRatio: number;
   diverseRatio: number;
+  diverseOffset?: number;
   maxEntityFilters: number;
 }) {
   const entityFilters = getEntityFilters(features, maxEntityFilters);
@@ -46,7 +48,14 @@ export async function fetchSampleDocuments({
     const diverseSize = Math.round(size * diverseRatio);
 
     const [{ hits: diverseHits }, { hits: randomHits }] = await Promise.all([
-      getDiverseSampleDocuments({ esClient, index, start, end, size: diverseSize }),
+      getDiverseSampleDocuments({
+        esClient,
+        index,
+        start,
+        end,
+        size: diverseSize,
+        offset: diverseOffset,
+      }),
       getSampleDocuments({ esClient, index, start, end, size }),
     ]);
 
@@ -68,6 +77,7 @@ export async function fetchSampleDocuments({
       totalFilters: 0,
       filtersCapped: false,
       hasFilteredDocuments: false,
+      nextOffset: diverseOffset + bucketCounts[0],
     };
   }
 
@@ -95,6 +105,7 @@ export async function fetchSampleDocuments({
         start,
         end,
         size: diverseSize + entityFilteredSize,
+        offset: diverseOffset,
       }),
       getSampleDocuments({
         esClient,
@@ -128,6 +139,7 @@ export async function fetchSampleDocuments({
     totalFilters: features.length,
     filtersCapped: features.length > maxEntityFilters,
     hasFilteredDocuments: entityFilteredHits.length > 0,
+    nextOffset: diverseOffset + bucketCounts[1],
   };
 }
 

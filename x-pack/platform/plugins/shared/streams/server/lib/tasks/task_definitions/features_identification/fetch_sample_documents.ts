@@ -106,7 +106,7 @@ export async function fetchSampleDocuments({
         logger.warn(`Entity-filtered sampling query failed: ${parseError(err).message}`);
         return EMPTY_SAMPLE;
       }),
-      diverseSize + entityFilteredSize > 0
+      diverseSize > 0
         ? getDiverseSampleDocuments({
             esClient,
             index,

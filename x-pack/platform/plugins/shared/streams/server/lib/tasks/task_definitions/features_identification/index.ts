@@ -217,6 +217,10 @@ export async function identifyStreamFeatures({
       diverseOffset,
     });
 
+    if (batchResult.nextOffset === diverseOffset) {
+      // Diverse sampling is expensive; once the pool is exhausted (offset did not advance), skip further diverse fetches.
+      diverseRatio = 0;
+    }
     diverseOffset = batchResult.nextOffset;
 
     if (batchResult.documents.length === 0) {

@@ -102,6 +102,7 @@ evaluate.describe(
           async ({
             esClient,
             inferenceClient,
+            evaluators,
             evaluationConnector,
             logger,
             executorClient,
@@ -218,6 +219,9 @@ evaluate.describe(
                   inferenceClient: evaluatorInferenceClient,
                 }),
                 createIdReuseEvaluator(),
+                evaluators.traceBasedEvaluators.inputTokens,
+                evaluators.traceBasedEvaluators.outputTokens,
+                evaluators.traceBasedEvaluators.cachedTokens,
               ]
             );
           }

@@ -23,6 +23,7 @@ interface DedupLoopOutput {
     previousFeatureCount: number;
   }>;
   mergeEvents: MergeEvent[];
+  fingerprintOnlyMergeEvents: MergeEvent[];
   finalFeatures: BaseFeature[];
   traceId?: string | null;
 }
@@ -132,6 +133,49 @@ const compactFeature = (feature: BaseFeature) => ({
 });
 
 /**
+ * Measures how often the model reused an existing feature id when it produced
+ * a feature that duplicated one already in the accumulator. A fingerprint-only
+ * match (same type, subtype and properties but a different id) is treated as
+ * an id-reuse miss: the model had enough signal via `previouslyIdentifiedFeatures`
+ * to reuse the existing id, but chose a new one.
+ *
+ * Score = id-based merges / (id-based merges + fingerprint-only merges).
+ * 1 means perfect id reuse; <1 means the model produced new ids for features
+ * it should have recognized as already identified.
+ */
+export const createIdReuseEvaluator = () => ({
+  name: 'id_reuse',
+  kind: 'CODE' as const,
+  evaluate: async ({ output }: { output: DedupLoopOutput }) => {
+    const { mergeEvents, fingerprintOnlyMergeEvents } = output;
+    const totalDuplicates = mergeEvents.length + fingerprintOnlyMergeEvents.length;
+
+    if (totalDuplicates === 0) {
+      return { score: null, explanation: 'Inconclusive: no duplicate features were produced' };
+    }
+
+    const score = mergeEvents.length / totalDuplicates;
+
+    return {
+      score,
+      explanation:
+        fingerprintOnlyMergeEvents.length > 0
+          ? `${fingerprintOnlyMergeEvents.length}/${totalDuplicates} duplicate feature(s) were produced with a new id instead of reusing the existing one`
+          : `All ${totalDuplicates} duplicate feature(s) reused the existing id`,
+      metadata: {
+        total_duplicates: totalDuplicates,
+        id_reused: mergeEvents.length,
+        id_missed: fingerprintOnlyMergeEvents.length,
+        missed_events: fingerprintOnlyMergeEvents.map((event) => ({
+          existing: compactFeature(event.existing),
+          incoming: compactFeature(event.incoming),
+        })),
+      },
+    };
+  },
+});
+
+/**
  * Evaluates whether id-based feature merges are semantically correct.
  * Score = correct merges / total merges. A score < 1 means some merges
  * combined features that represent different real-world concepts.
@@ -186,6 +230,13 @@ export const createMergeCorrectnessEvaluator = ({
                 `Result index ${result.index} is out of bounds (0..${compactEvents.length - 1})`
               );
             }
+          }
+
+          const uniqueIndices = new Set(results.map((r: { index: number }) => r.index));
+          if (uniqueIndices.size !== compactEvents.length) {
+            throw new Error(
+              `Expected ${compactEvents.length} unique result indices covering every merge event, got ${uniqueIndices.size}`
+            );
           }
 
           return { response: toolCall.function.arguments };

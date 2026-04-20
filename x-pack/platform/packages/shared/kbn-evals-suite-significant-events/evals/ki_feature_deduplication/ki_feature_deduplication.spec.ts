@@ -22,6 +22,7 @@ import { evaluate } from '../../src/evaluate';
 import {
   createSemanticUniquenessEvaluator,
   createMergeCorrectnessEvaluator,
+  createIdReuseEvaluator,
 } from '../../src/evaluators/ki_feature_deduplication/evaluators';
 import {
   getActiveDatasets,
@@ -113,10 +114,11 @@ evaluate.describe(
             await executorClient.runExperiment(
               {
                 dataset: {
-                  name: `sigevents: KI deduplication: ${scenario.input.scenario_id} (${dataset.id})`,
-                  description: `[${dataset.id}] KI deduplication across ${scenario.input.iterations} iterations on ${scenario.input.scenario_id}`,
+                  name: `sigevents: KI feature deduplication (${dataset.id})`,
+                  description: `[${dataset.id}] KI feature deduplication across scenarios`,
                   examples: [
                     {
+                      id: scenario.input.scenario_id,
                       input: {
                         stream_name: MANAGED_STREAM_NAME,
                         iterations: scenario.input.iterations,
@@ -139,6 +141,7 @@ evaluate.describe(
                   }> = [];
                   const accumulated = new FeatureAccumulator();
                   const mergeEvents = [];
+                  const fingerprintOnlyMergeEvents = [];
 
                   for (let i = 0; i < input.iterations; i++) {
                     const sampleDocuments = await collectSampleDocuments({
@@ -170,8 +173,14 @@ evaluate.describe(
                       const existing = accumulated.findDuplicate(baseFeature);
                       if (existing) {
                         if (existing.id.toLowerCase() === baseFeature.id.toLowerCase()) {
-                          // only store an event if the id is the same
+                          // id-based merges are LLM judgment calls and are graded by the
+                          // merge correctness evaluator
                           mergeEvents.push({ existing, incoming: baseFeature });
+                        } else {
+                          // fingerprint-only matches mean the model failed to reuse an
+                          // existing id even though the feature was already known; tracked
+                          // for the id-reuse evaluator
+                          fingerprintOnlyMergeEvents.push({ existing, incoming: baseFeature });
                         }
                         const merged = mergeFeature(existing, baseFeature);
 
@@ -195,6 +204,7 @@ evaluate.describe(
                   return {
                     iterations,
                     mergeEvents,
+                    fingerprintOnlyMergeEvents,
                     finalFeatures: accumulated.getAll(),
                     traceId: getCurrentTraceId(),
                   };
@@ -207,6 +217,7 @@ evaluate.describe(
                 createMergeCorrectnessEvaluator({
                   inferenceClient: evaluatorInferenceClient,
                 }),
+                createIdReuseEvaluator(),
               ]
             );
           }

@@ -6,7 +6,7 @@
  */
 
 import { hasSameFingerprint, type BaseFeature } from '@kbn/streams-schema';
-import { uniqBy, uniqWith } from 'lodash';
+import { chunk, uniqBy, uniqWith } from 'lodash';
 import type { BoundInferenceClient } from '@kbn/inference-common';
 import { executeUntilValid } from '@kbn/inference-prompt-utils';
 import { SemanticUniquenessPrompt } from './semantic_uniqueness/prompt';
@@ -175,10 +175,15 @@ export const createIdReuseEvaluator = () => ({
   },
 });
 
+const MERGE_CORRECTNESS_BATCH_SIZE = 20;
+
 /**
  * Evaluates whether id-based feature merges are semantically correct.
  * Score = correct merges / total merges. A score < 1 means some merges
  * combined features that represent different real-world concepts.
+ *
+ * Large payloads are split into batches of MERGE_CORRECTNESS_BATCH_SIZE to
+ * keep each LLM call small and avoid length-mismatch validation failures.
  */
 export const createMergeCorrectnessEvaluator = ({
   inferenceClient,
@@ -205,55 +210,52 @@ export const createMergeCorrectnessEvaluator = ({
       incoming: compactFeature(event.incoming),
     }));
 
-    const response = await executeUntilValid({
-      prompt: MergeCorrectnessPrompt,
-      inferenceClient,
-      input: {
-        stream_name: input?.stream_name,
-        merge_events: JSON.stringify(compactEvents),
-      },
-      finalToolChoice: { function: 'evaluate_merges' as const },
-      maxRetries: 3,
-      toolCallbacks: {
-        evaluate_merges: async (toolCall) => {
-          const { results } = toolCall.function.arguments;
+    const chunks = chunk(compactEvents, MERGE_CORRECTNESS_BATCH_SIZE);
 
-          if (results.length !== compactEvents.length) {
-            throw new Error(
-              `Expected ${compactEvents.length} results (one per merge event), got ${results.length}`
-            );
-          }
+    const results: Array<{ correct: boolean; reason: string }> = [];
+    const explanations: string[] = [];
 
-          for (const result of results) {
-            if (result.index < 0 || result.index >= compactEvents.length) {
+    for (const chunk of chunks) {
+      const response = await executeUntilValid({
+        prompt: MergeCorrectnessPrompt,
+        inferenceClient,
+        input: {
+          stream_name: input?.stream_name,
+          merge_events: JSON.stringify(chunk),
+        },
+        finalToolChoice: { function: 'evaluate_merges' as const },
+        maxRetries: 3,
+        toolCallbacks: {
+          evaluate_merges: async (toolCall) => {
+            const { results } = toolCall.function.arguments;
+
+            if (results.length !== chunk.length) {
               throw new Error(
-                `Result index ${result.index} is out of bounds (0..${compactEvents.length - 1})`
+                `Expected ${chunk.length} results (one per merge event), got ${results.length}`
               );
             }
-          }
 
-          const uniqueIndices = new Set(results.map((r: { index: number }) => r.index));
-          if (uniqueIndices.size !== compactEvents.length) {
-            throw new Error(
-              `Expected ${compactEvents.length} unique result indices covering every merge event, got ${uniqueIndices.size}`
-            );
-          }
-
-          return { response: toolCall.function.arguments };
+            return { response: toolCall.function.arguments };
+          },
         },
-      },
-    });
+      });
 
-    const { results, explanation } = response.toolCalls[0].function.arguments;
-    const correctCount = results.filter((r: { correct: boolean }) => r.correct).length;
+      const batch = response.toolCalls[0].function.arguments;
+      results.push(...batch.results);
+      explanations.push(batch.explanation);
+    }
+
+    const correctCount = results.filter(({ correct }) => correct).length;
     const score = correctCount / mergeEvents.length;
+    const explanation = explanations.join(' | ');
 
     const incorrectMerges = results
-      .filter((r: { correct: boolean }) => !r.correct)
-      .map((r: { index: number; reason: string }) => ({
-        existing: compactEvents[r.index].existing,
-        incoming: compactEvents[r.index].incoming,
-        reason: r.reason,
+      .map((result, index) => ({ ...result, index }))
+      .filter(({ correct }) => !correct)
+      .map(({ index, reason }) => ({
+        existing: compactEvents[index].existing,
+        incoming: compactEvents[index].incoming,
+        reason,
       }));
 
     return {

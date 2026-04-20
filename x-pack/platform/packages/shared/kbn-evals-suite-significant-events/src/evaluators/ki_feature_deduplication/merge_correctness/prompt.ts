@@ -18,10 +18,6 @@ const MERGE_CORRECTNESS_OUTPUT_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          index: {
-            type: 'number',
-            description: 'Zero-based index of the merge event in the input array',
-          },
           correct: {
             type: 'boolean',
             description:
@@ -32,9 +28,10 @@ const MERGE_CORRECTNESS_OUTPUT_SCHEMA = {
             description: 'One-sentence explanation of why the merge is correct or incorrect',
           },
         },
-        required: ['index', 'correct', 'reason'],
+        required: ['correct', 'reason'],
       },
-      description: 'One verdict per merge event, in input order',
+      description:
+        'One verdict per merge event, in the same order as the input array. Must contain exactly as many entries as there are merge events.',
     },
     explanation: {
       type: 'string',

@@ -230,7 +230,7 @@ export const createMergeCorrectnessEvaluator = ({
             const args = toolCall.function.arguments;
             if (args.results.length !== batch.length) {
               throw new Error(
-                `Expected ${batch.length} results (one per merge event), got ${results.length}`
+                `Expected ${batch.length} results (one per merge event), got ${args.results.length}`
               );
             }
 

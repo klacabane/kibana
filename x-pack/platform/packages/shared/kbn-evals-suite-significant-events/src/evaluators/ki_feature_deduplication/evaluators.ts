@@ -210,18 +210,18 @@ export const createMergeCorrectnessEvaluator = ({
       incoming: compactFeature(event.incoming),
     }));
 
-    const chunks = chunk(compactEvents, MERGE_CORRECTNESS_BATCH_SIZE);
+    const batches = chunk(compactEvents, MERGE_CORRECTNESS_BATCH_SIZE);
 
     const results: Array<{ correct: boolean; reason: string }> = [];
     const explanations: string[] = [];
 
-    for (const chunk of chunks) {
+    for (const batch of batches) {
       const response = await executeUntilValid({
         prompt: MergeCorrectnessPrompt,
         inferenceClient,
         input: {
           stream_name: input?.stream_name,
-          merge_events: JSON.stringify(chunk),
+          merge_events: JSON.stringify(batch),
         },
         finalToolChoice: { function: 'evaluate_merges' as const },
         maxRetries: 3,
@@ -229,9 +229,9 @@ export const createMergeCorrectnessEvaluator = ({
           evaluate_merges: async (toolCall) => {
             const { results } = toolCall.function.arguments;
 
-            if (results.length !== chunk.length) {
+            if (results.length !== batch.length) {
               throw new Error(
-                `Expected ${chunk.length} results (one per merge event), got ${results.length}`
+                `Expected ${batch.length} results (one per merge event), got ${results.length}`
               );
             }
 
@@ -240,9 +240,9 @@ export const createMergeCorrectnessEvaluator = ({
         },
       });
 
-      const batch = response.toolCalls[0].function.arguments;
-      results.push(...batch.results);
-      explanations.push(batch.explanation);
+      const toolCallArgs = response.toolCalls[0].function.arguments;
+      results.push(...toolCallArgs.results);
+      explanations.push(toolCallArgs.explanation);
     }
 
     const correctCount = results.filter(({ correct }) => correct).length;

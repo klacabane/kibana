@@ -227,9 +227,8 @@ export const createMergeCorrectnessEvaluator = ({
         maxRetries: 3,
         toolCallbacks: {
           evaluate_merges: async (toolCall) => {
-            const { results } = toolCall.function.arguments;
-
-            if (results.length !== batch.length) {
+            const args = toolCall.function.arguments;
+            if (args.results.length !== batch.length) {
               throw new Error(
                 `Expected ${batch.length} results (one per merge event), got ${results.length}`
               );

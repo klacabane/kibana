@@ -18,10 +18,6 @@ interface MergeEvent {
 }
 
 interface DedupLoopOutput {
-  iterations: Array<{
-    features: BaseFeature[];
-    previousFeatureCount: number;
-  }>;
   mergeEvents: MergeEvent[];
   fingerprintOnlyMergeEvents: MergeEvent[];
   finalFeatures: BaseFeature[];
@@ -205,17 +201,19 @@ export const createMergeCorrectnessEvaluator = ({
       return { score: null, explanation: 'Inconclusive: no merge events to evaluate' };
     }
 
-    const compactEvents = mergeEvents.map((event) => ({
+    const compactEvents = mergeEvents.map((event, eventIndex) => ({
+      event_index: eventIndex,
       existing: compactFeature(event.existing),
       incoming: compactFeature(event.incoming),
     }));
 
     const batches = chunk(compactEvents, MERGE_CORRECTNESS_BATCH_SIZE);
 
-    const results: Array<{ correct: boolean; reason: string }> = [];
+    const results: Array<{ event_index: number; correct: boolean; reason: string }> = [];
     const explanations: string[] = [];
 
     for (const batch of batches) {
+      const expectedIndices = new Set(batch.map((event) => event.event_index));
       const response = await executeUntilValid({
         prompt: MergeCorrectnessPrompt,
         inferenceClient,
@@ -234,6 +232,21 @@ export const createMergeCorrectnessEvaluator = ({
               );
             }
 
+            const seenIndices = new Set<number>();
+            for (const result of args.results) {
+              if (!expectedIndices.has(result.event_index)) {
+                throw new Error(
+                  `Result references unknown event_index ${result.event_index}; expected one of [${[
+                    ...expectedIndices,
+                  ].join(', ')}]`
+                );
+              }
+              if (seenIndices.has(result.event_index)) {
+                throw new Error(`Duplicate event_index ${result.event_index} in results`);
+              }
+              seenIndices.add(result.event_index);
+            }
+
             return { response: toolCall.function.arguments };
           },
         },
@@ -249,11 +262,10 @@ export const createMergeCorrectnessEvaluator = ({
     const explanation = explanations.join(' | ');
 
     const incorrectMerges = results
-      .map((result, index) => ({ ...result, index }))
       .filter(({ correct }) => !correct)
-      .map(({ index, reason }) => ({
-        existing: compactEvents[index].existing,
-        incoming: compactEvents[index].incoming,
+      .map(({ event_index: eventIndex, reason }) => ({
+        existing: compactEvents[eventIndex].existing,
+        incoming: compactEvents[eventIndex].incoming,
         reason,
       }));
 

@@ -8,7 +8,7 @@
 import { identifyFeatures, toPreviouslyIdentifiedFeature } from '@kbn/streams-ai';
 import { featuresPrompt } from '@kbn/streams-ai/src/features/prompt';
 import { tags } from '@kbn/scout';
-import { getCurrentTraceId } from '@kbn/evals';
+import { createSpanLatencyEvaluator, getCurrentTraceId } from '@kbn/evals';
 import { FeatureAccumulator, type BaseFeature, mergeFeature } from '@kbn/streams-schema';
 import { v4 as uuidv4 } from 'uuid';
 import type { GcsConfig } from '../../src/data_generators/replay';
@@ -106,6 +106,7 @@ evaluate.describe(
             evaluationConnector,
             logger,
             executorClient,
+            traceEsClient,
             log,
           }) => {
             const evaluatorInferenceClient = inferenceClient.bindTo({
@@ -222,6 +223,7 @@ evaluate.describe(
                 evaluators.traceBasedEvaluators.inputTokens,
                 evaluators.traceBasedEvaluators.outputTokens,
                 evaluators.traceBasedEvaluators.cachedTokens,
+                createSpanLatencyEvaluator({ traceEsClient, log, spanName: 'ChatComplete' }),
               ]
             );
           }

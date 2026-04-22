@@ -8,13 +8,12 @@
 import { getLogPatterns } from '@kbn/ai-tools';
 import { LOG_PATTERNS_FEATURE_TYPE } from '@kbn/streams-schema';
 import { createTracedEsClient } from '@kbn/traced-es-client';
-import { uniqBy } from 'lodash';
 import type { ComputedFeatureGenerator } from './types';
 
 const LOG_MESSAGE_FIELDS = ['message', 'body.text'];
 
-const MAX_PATTERNS = 10;
 const MAX_COMMON_PATTERNS = 4;
+const MAX_RARE_PATTERNS = 6;
 const MAX_SAMPLE_LENGTH = 500;
 
 const truncateSample = (sample: string) =>
@@ -29,10 +28,10 @@ export interface LogPatternEntry {
 
 export function selectLogPatternsForLlm(patterns: LogPatternEntry[]): LogPatternEntry[] {
   const common = patterns.slice(0, MAX_COMMON_PATTERNS);
-  const rare = patterns.slice(-(MAX_PATTERNS - MAX_COMMON_PATTERNS));
-  const selected = uniqBy([...common, ...rare], (p) => p.sample);
+  const rareStart = Math.max(MAX_COMMON_PATTERNS, patterns.length - MAX_RARE_PATTERNS);
+  const rare = patterns.slice(rareStart);
 
-  return selected.map(({ field, pattern, count, sample }) => ({
+  return [...common, ...rare].map(({ field, pattern, count, sample }) => ({
     pattern,
     count,
     sample: truncateSample(sample),

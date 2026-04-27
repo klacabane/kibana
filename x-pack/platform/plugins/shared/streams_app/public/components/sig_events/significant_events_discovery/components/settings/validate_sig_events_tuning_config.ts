@@ -56,7 +56,7 @@ export function validateSigEventsTuningConfig(parsed: Record<string, unknown>): 
       if (typeof bounds.max === 'number') {
         errors.push(`"${key}" must be between ${bounds.min} and ${bounds.max}`);
       } else {
-        errors.push(`"${key}" must be greater than ${bounds.min}`);
+        errors.push(`"${key}" must be at least ${bounds.min}`);
       }
     }
   }

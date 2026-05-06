@@ -6,10 +6,9 @@
  */
 
 import type { QueryDslQueryContainer, SortOrder } from '@elastic/elasticsearch/lib/api/types';
-import type { Logger } from '@kbn/core/server';
 import type { IDataStreamClient } from '@kbn/data-streams';
 import { termQuery } from '@kbn/es-query';
-import { normalizeSearchTotal, readScalar, summarizeBulkErrors } from '../../data_streams';
+import { readScalar } from '../storage_utils';
 import { RULE_UUID, TIMESTAMP } from './fields';
 import { type StoredDetection, type detectionsMappings } from './data_stream';
 
@@ -38,37 +37,21 @@ export class DetectionClient {
   constructor(
     private readonly clients: {
       dataStreamClient: DetectionDataStreamClient;
-      logger: Logger;
       space: string;
     }
   ) {}
 
-  async bulkCreate(detections: Detection[]): Promise<{ created: number }> {
-    if (detections.length === 0) {
-      return { created: 0 };
-    }
-
-    const documents = detections.map(toStorage);
-
-    const response = await this.clients.dataStreamClient.create({
+  async bulkCreate(detections: Detection[]) {
+    return this.clients.dataStreamClient.create({
       space: this.clients.space,
-      documents,
+      documents: detections,
     });
-    const { failed, total } = summarizeBulkErrors(response);
-
-    if (failed > 0) {
-      this.clients.logger.error(`Failed to create ${failed}/${total} detections`, {
-        tags: ['detections'],
-      });
-    }
-
-    return { created: documents.length };
   }
 
   async findByStream(
     ruleUuid: string,
     options: FindByStreamOptions = {}
-  ): Promise<{ hits: Detection[]; total: number }> {
+  ): Promise<{ hits: Detection[] }> {
     const { size = DEFAULT_PAGE_SIZE, from, to, sortOrder = 'desc' } = options;
 
     const filters: QueryDslQueryContainer[] = [...termQuery(RULE_UUID, ruleUuid)];
@@ -87,29 +70,15 @@ export class DetectionClient {
     const response = await this.clients.dataStreamClient.search({
       space: this.clients.space,
       size,
-      track_total_hits: true,
+      _source: true,
       query: { bool: { filter: filters } },
       sort: [{ [TIMESTAMP]: { order: sortOrder } }],
     });
 
     return {
-      hits: response.hits.hits.flatMap((hit) => (hit._source ? [fromStorage(hit._source)] : [])),
-      total: normalizeSearchTotal(response.hits.total),
+      hits: response.hits.hits.map((hit) => fromStorage(hit._source!)),
     };
   }
-
-  async exists(): Promise<boolean> {
-    return this.clients.dataStreamClient.exists();
-  }
-}
-
-export function toStorage(detection: Detection): StoredDetection {
-  return {
-    '@timestamp': detection['@timestamp'],
-    rule_uuid: detection.rule_uuid,
-    rule_name: detection.rule_name,
-    stream: detection.stream,
-  } as StoredDetection;
 }
 
 export function fromStorage(stored: StoredDetection): Detection {

@@ -35,7 +35,6 @@ export class VerdictService {
 
     return new VerdictClient({
       dataStreamClient,
-      logger: this.logger.get('verdicts'),
       space,
     });
   }

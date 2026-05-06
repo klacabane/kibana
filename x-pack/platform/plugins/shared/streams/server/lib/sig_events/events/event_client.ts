@@ -6,10 +6,9 @@
  */
 
 import type { QueryDslQueryContainer, SortOrder } from '@elastic/elasticsearch/lib/api/types';
-import type { Logger } from '@kbn/core/server';
 import type { IDataStreamClient } from '@kbn/data-streams';
 import { termQuery } from '@kbn/es-query';
-import { normalizeSearchTotal, readScalar, summarizeBulkErrors } from '../../data_streams';
+import { readScalar } from '../storage_utils';
 import { DISCOVERY_ID, TIMESTAMP, VERDICT } from './fields';
 import { type StoredEvent, type eventsMappings } from './data_stream';
 
@@ -38,55 +37,32 @@ export class EventClient {
   constructor(
     private readonly clients: {
       dataStreamClient: EventDataStreamClient;
-      logger: Logger;
       space: string;
     }
   ) {}
 
-  async bulkCreate(events: SigEvent[]): Promise<{ created: number }> {
-    if (events.length === 0) {
-      return { created: 0 };
-    }
-
-    const documents = events.map(toStorage);
-
-    const response = await this.clients.dataStreamClient.create({
+  async bulkCreate(events: SigEvent[]) {
+    return this.clients.dataStreamClient.create({
       space: this.clients.space,
-      documents,
+      documents: events,
     });
-    const { failed, total } = summarizeBulkErrors(response);
-
-    if (failed > 0) {
-      this.clients.logger.error(`Failed to create ${failed}/${total} events`, {
-        tags: ['events'],
-      });
-    }
-
-    return { created: documents.length };
   }
 
-  async findByVerdict(
-    verdict: string,
-    options: FindOptions = {}
-  ): Promise<{ hits: SigEvent[]; total: number }> {
+  async findByVerdict(verdict: string, options: FindOptions = {}): Promise<{ hits: SigEvent[] }> {
     return this.search([...termQuery(VERDICT, verdict)], options);
   }
 
   async findByDiscoveryId(
     discoveryId: string,
     options: FindOptions = {}
-  ): Promise<{ hits: SigEvent[]; total: number }> {
+  ): Promise<{ hits: SigEvent[] }> {
     return this.search([...termQuery(DISCOVERY_ID, discoveryId)], options);
-  }
-
-  async exists(): Promise<boolean> {
-    return this.clients.dataStreamClient.exists();
   }
 
   private async search(
     baseFilters: QueryDslQueryContainer[],
     options: FindOptions
-  ): Promise<{ hits: SigEvent[]; total: number }> {
+  ): Promise<{ hits: SigEvent[] }> {
     const { size = DEFAULT_PAGE_SIZE, from, to, sortOrder = 'desc' } = options;
     const filters: QueryDslQueryContainer[] = [...baseFilters];
 
@@ -104,28 +80,15 @@ export class EventClient {
     const response = await this.clients.dataStreamClient.search({
       space: this.clients.space,
       size,
-      track_total_hits: true,
+      _source: true,
       query: { bool: { filter: filters } },
       sort: [{ [TIMESTAMP]: { order: sortOrder } }],
     });
 
     return {
-      hits: response.hits.hits.flatMap((hit) => (hit._source ? [fromStorage(hit._source)] : [])),
-      total: normalizeSearchTotal(response.hits.total),
+      hits: response.hits.hits.map((hit) => fromStorage(hit._source!)),
     };
   }
-}
-
-export function toStorage(event: SigEvent): StoredEvent {
-  return {
-    '@timestamp': event['@timestamp'],
-    event_id: event.event_id,
-    verdict: event.verdict,
-    verdict_id: event.verdict_id,
-    discovery_id: event.discovery_id,
-    discovery_slug: event.discovery_slug,
-    title: event.title,
-  } as StoredEvent;
 }
 
 export function fromStorage(stored: StoredEvent): SigEvent {

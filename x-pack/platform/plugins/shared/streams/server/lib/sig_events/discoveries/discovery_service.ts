@@ -39,7 +39,6 @@ export class DiscoveryService {
 
     return new DiscoveryClient({
       dataStreamClient,
-      logger: this.logger.get('discoveries'),
       space,
     });
   }

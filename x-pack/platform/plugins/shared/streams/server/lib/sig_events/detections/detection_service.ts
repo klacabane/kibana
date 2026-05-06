@@ -35,7 +35,6 @@ export class DetectionService {
 
     return new DetectionClient({
       dataStreamClient,
-      logger: this.logger.get('detections'),
       space,
     });
   }

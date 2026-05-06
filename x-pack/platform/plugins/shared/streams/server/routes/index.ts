@@ -35,6 +35,7 @@ import { internalOnboardingRoutes } from './internal/streams/onboarding/route';
 import { internalQueriesRoutes } from './internal/sig_events/queries/route';
 import { internalEligibleStreamsRoutes } from './internal/sig_events/extraction/eligible_streams_route';
 import { internalSignificantEventsSettingsRoutes } from './internal/sig_events/significant_events_settings/route';
+import { dummySignificantEventsRoutes } from './internal/sig_events/dummy_data/route';
 import { timeSeriesRoutes } from './internal/streams/time_series/route';
 import { internalMemoryRoutes } from './internal/memory/route';
 
@@ -61,6 +62,7 @@ export const streamsRouteRepository = {
   ...internalQueriesRoutes,
   ...internalEligibleStreamsRoutes,
   ...internalSignificantEventsSettingsRoutes,
+  ...dummySignificantEventsRoutes,
   ...internalMemoryRoutes,
   // public APIs
   ...docCountsRoutes,

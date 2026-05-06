@@ -32,7 +32,6 @@ export class EventService {
 
     return new EventClient({
       dataStreamClient,
-      logger: this.logger.get('events'),
       space,
     });
   }

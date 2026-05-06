@@ -6,10 +6,9 @@
  */
 
 import type { QueryDslQueryContainer, SortOrder } from '@elastic/elasticsearch/lib/api/types';
-import type { Logger } from '@kbn/core/server';
 import type { IDataStreamClient } from '@kbn/data-streams';
 import { termQuery } from '@kbn/es-query';
-import { normalizeSearchTotal, readScalar, summarizeBulkErrors } from '../../data_streams';
+import { readScalar } from '../storage_utils';
 import { DISCOVERY_ID, TIMESTAMP } from './fields';
 import { type StoredDiscovery, type discoveriesMappings } from './data_stream';
 
@@ -39,48 +38,28 @@ export class DiscoveryClient {
   constructor(
     private readonly clients: {
       dataStreamClient: DiscoveryDataStreamClient;
-      logger: Logger;
       space: string;
     }
   ) {}
 
-  async bulkCreate(discoveries: Discovery[]): Promise<{ created: number }> {
-    if (discoveries.length === 0) {
-      return { created: 0 };
-    }
-
-    const documents = discoveries.map(toStorage);
-
-    const response = await this.clients.dataStreamClient.create({
+  async bulkCreate(discoveries: Discovery[]) {
+    return this.clients.dataStreamClient.create({
       space: this.clients.space,
-      documents,
+      documents: discoveries,
     });
-    const { failed, total } = summarizeBulkErrors(response);
-
-    if (failed > 0) {
-      this.clients.logger.error(`Failed to create ${failed}/${total} discoveries`, {
-        tags: ['discoveries'],
-      });
-    }
-
-    return { created: documents.length };
   }
 
   async findByDiscoveryId(
     discoveryId: string,
     options: FindOptions = {}
-  ): Promise<{ hits: Discovery[]; total: number }> {
+  ): Promise<{ hits: Discovery[] }> {
     return this.search([...termQuery(DISCOVERY_ID, discoveryId)], options);
-  }
-
-  async exists(): Promise<boolean> {
-    return this.clients.dataStreamClient.exists();
   }
 
   private async search(
     baseFilters: QueryDslQueryContainer[],
     options: FindOptions
-  ): Promise<{ hits: Discovery[]; total: number }> {
+  ): Promise<{ hits: Discovery[] }> {
     const { size = DEFAULT_PAGE_SIZE, from, to, sortOrder = 'desc' } = options;
     const filters: QueryDslQueryContainer[] = [...baseFilters];
 
@@ -98,26 +77,15 @@ export class DiscoveryClient {
     const response = await this.clients.dataStreamClient.search({
       space: this.clients.space,
       size,
-      track_total_hits: true,
+      _source: true,
       query: { bool: { filter: filters } },
       sort: [{ [TIMESTAMP]: { order: sortOrder } }],
     });
 
     return {
-      hits: response.hits.hits.flatMap((hit) => (hit._source ? [fromStorage(hit._source)] : [])),
-      total: normalizeSearchTotal(response.hits.total),
+      hits: response.hits.hits.map((hit) => fromStorage(hit._source!)),
     };
   }
-}
-
-export function toStorage(discovery: Discovery): StoredDiscovery {
-  return {
-    '@timestamp': discovery['@timestamp'],
-    discovery_id: discovery.discovery_id,
-    discovery_slug: discovery.discovery_slug,
-    status: discovery.status,
-    title: discovery.title,
-  } as StoredDiscovery;
 }
 
 export function fromStorage(stored: StoredDiscovery): Discovery {

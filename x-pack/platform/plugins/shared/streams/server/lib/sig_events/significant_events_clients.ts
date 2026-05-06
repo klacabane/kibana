@@ -56,16 +56,11 @@ export function createSignificantEventsClients({
   esClient: ElasticsearchClient;
   space: string;
 }): SignificantEventsClients {
-  let detection: Promise<DetectionClient> | undefined;
-  let discovery: Promise<DiscoveryClient> | undefined;
-  let event: Promise<EventClient> | undefined;
-  let verdict: Promise<VerdictClient> | undefined;
-
   return {
-    getDetectionClient: () => (detection ??= services.detection.getClient({ esClient, space })),
-    getDiscoveryClient: () => (discovery ??= services.discovery.getClient({ esClient, space })),
-    getEventClient: () => (event ??= services.event.getClient({ esClient, space })),
-    getVerdictClient: () => (verdict ??= services.verdict.getClient({ esClient, space })),
+    getDetectionClient: () => services.detection.getClient({ esClient, space }),
+    getDiscoveryClient: () => services.discovery.getClient({ esClient, space }),
+    getEventClient: () => services.event.getClient({ esClient, space }),
+    getVerdictClient: () => services.verdict.getClient({ esClient, space }),
   };
 }
 

@@ -5,7 +5,6 @@
  * 2.0.
  */
 
-import { errors as EsErrors } from '@elastic/elasticsearch';
 import type { ElasticsearchClient, Logger } from '@kbn/core/server';
 import { DataStreamClient } from '@kbn/data-streams';
 import type { AnyDataStreamDefinition } from '@kbn/data-streams';
@@ -84,18 +83,9 @@ export async function initializeSignificantEventsTemplates({
           dataStream: definition,
           elasticsearchClient: esClient,
           logger,
+          lazyCreation: true,
         });
       } catch (error) {
-        if (
-          error instanceof EsErrors.ResponseError &&
-          error.statusCode === 403 &&
-          error.body?.error?.type === 'security_exception'
-        ) {
-          logger.debug(
-            `Skipping internal-user creation of ${definition.name}; the data stream will be auto-created on the first write performed as the calling user.`
-          );
-          return;
-        }
         logger.error(
           `Failed to initialize template for ${definition.name}: ${
             error instanceof Error ? error.message : String(error)

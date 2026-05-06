@@ -5,11 +5,11 @@
  * 2.0.
  */
 
-import type { QueryDslQueryContainer, SortOrder } from '@elastic/elasticsearch/lib/api/types';
 import type { IDataStreamClient } from '@kbn/data-streams';
-import { termQuery } from '@kbn/es-query';
+import { dateRangeQuery } from '@kbn/es-query';
+import { type CommonSearchOptions } from '../query_utils';
 import { readScalar } from '../storage_utils';
-import { DISCOVERY_ID, TIMESTAMP, VERDICT } from './fields';
+import { TIMESTAMP } from './fields';
 import { type StoredEvent, type eventsMappings } from './data_stream';
 
 export interface SigEvent {
@@ -20,13 +20,6 @@ export interface SigEvent {
   discovery_id: string;
   discovery_slug: string;
   title: string;
-}
-
-export interface FindOptions {
-  size?: number;
-  from?: string | number;
-  to?: string | number;
-  sortOrder?: SortOrder;
 }
 
 const DEFAULT_PAGE_SIZE = 1_000;
@@ -48,41 +41,13 @@ export class EventClient {
     });
   }
 
-  async findByVerdict(verdict: string, options: FindOptions = {}): Promise<{ hits: SigEvent[] }> {
-    return this.search([...termQuery(VERDICT, verdict)], options);
-  }
-
-  async findByDiscoveryId(
-    discoveryId: string,
-    options: FindOptions = {}
-  ): Promise<{ hits: SigEvent[] }> {
-    return this.search([...termQuery(DISCOVERY_ID, discoveryId)], options);
-  }
-
-  private async search(
-    baseFilters: QueryDslQueryContainer[],
-    options: FindOptions
-  ): Promise<{ hits: SigEvent[] }> {
-    const { size = DEFAULT_PAGE_SIZE, from, to, sortOrder = 'desc' } = options;
-    const filters: QueryDslQueryContainer[] = [...baseFilters];
-
-    if (from !== undefined || to !== undefined) {
-      filters.push({
-        range: {
-          [TIMESTAMP]: {
-            ...(from !== undefined ? { gte: from } : {}),
-            ...(to !== undefined ? { lte: to } : {}),
-          },
-        },
-      });
-    }
-
+  async search(options: CommonSearchOptions = {}): Promise<{ hits: SigEvent[] }> {
     const response = await this.clients.dataStreamClient.search({
       space: this.clients.space,
-      size,
+      size: DEFAULT_PAGE_SIZE,
       _source: true,
-      query: { bool: { filter: filters } },
-      sort: [{ [TIMESTAMP]: { order: sortOrder } }],
+      query: { bool: { filter: dateRangeQuery(options.from, options.to, TIMESTAMP) } },
+      sort: [{ [TIMESTAMP]: { order: 'desc' } }],
     });
 
     return {
